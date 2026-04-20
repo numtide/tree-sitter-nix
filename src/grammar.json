@@ -25,7 +25,7 @@
     },
     "keyword": {
       "type": "PATTERN",
-      "value": "if|then|else|let|inherit|in|rec|with|assert"
+      "value": "if|then|else|let|inherit|in|rec|with|assert|or"
     },
     "identifier": {
       "type": "PATTERN",
@@ -1796,6 +1796,15 @@
                 "name": "identifier"
               },
               {
+                "type": "ALIAS",
+                "content": {
+                  "type": "STRING",
+                  "value": "or"
+                },
+                "named": true,
+                "value": "identifier"
+              },
+              {
                 "type": "SYMBOL",
                 "name": "string_expression"
               },
@@ -1826,6 +1835,15 @@
                       "name": "identifier"
                     },
                     {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "STRING",
+                        "value": "or"
+                      },
+                      "named": true,
+                      "value": "identifier"
+                    },
+                    {
                       "type": "SYMBOL",
                       "name": "string_expression"
                     },
@@ -1852,6 +1870,15 @@
             {
               "type": "SYMBOL",
               "name": "identifier"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "STRING",
+                "value": "or"
+              },
+              "named": true,
+              "value": "identifier"
             },
             {
               "type": "SYMBOL",

@@ -47,7 +47,7 @@ module.exports = grammar({
 
     // Keywords go before identifiers to let them take precedence when both are expected.
     // Workaround before https://github.com/tree-sitter/tree-sitter/pull/246
-    keyword: ($) => /if|then|else|let|inherit|in|rec|with|assert/,
+    keyword: ($) => /if|then|else|let|inherit|in|rec|with|assert|or/,
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_\'\-]*/,
 
     variable_expression: ($) => field("name", $.identifier),
@@ -369,7 +369,12 @@ module.exports = grammar({
       sep1(
         field(
           "attr",
-          choice($.identifier, $.string_expression, $.interpolation),
+          choice(
+            $.identifier,
+            alias("or", $.identifier),
+            $.string_expression,
+            $.interpolation,
+          ),
         ),
         ".",
       ),
@@ -378,7 +383,12 @@ module.exports = grammar({
       repeat1(
         field(
           "attr",
-          choice($.identifier, $.string_expression, $.interpolation),
+          choice(
+            $.identifier,
+            alias("or", $.identifier),
+            $.string_expression,
+            $.interpolation,
+          ),
         ),
       ),
 
