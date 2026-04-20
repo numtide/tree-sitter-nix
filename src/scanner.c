@@ -122,6 +122,7 @@ static bool scan_path_start(TSLexer *lexer) {
 
   bool have_sep = false;
   bool have_after_sep = false;
+  bool prev_was_sep = false;
   int32_t c = lexer->lookahead;
 
   // unlike string_fragments which which are preceded by initial token (i.e.
@@ -139,8 +140,20 @@ static bool scan_path_start(TSLexer *lexer) {
     c = lexer->lookahead;
 
     if (c == '/') {
+      if (prev_was_sep) {
+        // Two '/' in a row.
+        // Nix's PATH regex requires `(\/{PATH_CHAR}+)+` — each separator
+        // must be followed by at least one path char. End the path token
+        // BEFORE the second '/' so the second '/' can open the `//`
+        // update operator. mark_end was already called at the top of the
+        // loop pointing at the first '/', so the token covers through the
+        // char before it.
+        return have_after_sep;
+      }
       have_sep = true;
+      prev_was_sep = true;
     } else if (is_path_char(c)) {
+      prev_was_sep = false;
       if (have_sep) {
         have_after_sep = true;
       }
