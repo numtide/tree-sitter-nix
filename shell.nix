@@ -11,12 +11,10 @@ pkgs.mkShell {
     pkgs.rustc
     pkgs.cargo
 
-    pkgs.emscripten
-
     # Formatters
     pkgs.treefmt
     pkgs.nixpkgs-fmt
-    pkgs.nodePackages.prettier
+    pkgs.prettier
     pkgs.rustfmt
     pkgs.clang-tools
   ];
