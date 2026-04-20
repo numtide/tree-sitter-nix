@@ -2,3 +2,12 @@ build
 node_modules
 target/
 nix.so
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+
+# Go
+vendor/
