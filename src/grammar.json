@@ -1835,12 +1835,20 @@
           "value": ")"
         },
         {
-          "type": "FIELD",
-          "name": "attrs",
-          "content": {
-            "type": "SYMBOL",
-            "name": "inherited_attrs"
-          }
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "attrs",
+              "content": {
+                "type": "SYMBOL",
+                "name": "inherited_attrs"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "STRING",
