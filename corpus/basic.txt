@@ -196,6 +196,32 @@ let inherit; in c
         (variable_expression (identifier))))
 
 ====================
+inherit (empty, attrset)
+====================
+
+{ inherit; }
+
+---
+
+(source_code
+    (attrset_expression
+        (binding_set
+            (inherit))))
+
+====================
+inherit (empty, rec attrset)
+====================
+
+rec { inherit; }
+
+---
+
+(source_code
+    (rec_attrset_expression
+        (binding_set
+            (inherit))))
+
+====================
 let (inherit from)
 ====================
 
