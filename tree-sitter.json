@@ -24,7 +24,7 @@
       }
     ],
     "links": {
-      "repository": "https://github.com/nix-community/tree-sitter-nix"
+      "repository": "https://github.com/numtide/tree-sitter-nix"
     }
   },
   "bindings": {

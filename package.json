@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nix-community/tree-sitter-nix.git"
+    "url": "git+https://github.com/numtide/tree-sitter-nix.git"
   },
   "author": "Charles Strahan",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/nix-community/tree-sitter-nix/issues"
+    "url": "https://github.com/numtide/tree-sitter-nix/issues"
   },
-  "homepage": "https://github.com/nix-community/tree-sitter-nix#readme",
+  "homepage": "https://github.com/numtide/tree-sitter-nix#readme",
   "dependencies": {
     "nan": "^2.17.0"
   },
