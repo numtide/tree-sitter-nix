@@ -11,8 +11,6 @@ pkgs.mkShell {
     pkgs.rustc
     pkgs.cargo
 
-    pkgs.emscripten
-
     # Formatters
     pkgs.treefmt
     pkgs.nixpkgs-fmt
