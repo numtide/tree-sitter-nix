@@ -239,6 +239,35 @@ let inherit (a) b "c" ${d}; in 123
         (integer_expression)))
 
 ====================
+inherit from (empty)
+====================
+
+let inherit (a); in 123
+
+---
+
+(source_code
+    (let_expression
+        (binding_set
+            (inherit_from
+                (variable_expression (identifier))))
+        (integer_expression)))
+
+====================
+inherit from (empty, attrset)
+====================
+
+{ inherit (x); }
+
+---
+
+(source_code
+    (attrset_expression
+        (binding_set
+            (inherit_from
+                (variable_expression (identifier))))))
+
+====================
 function_expression
 ====================
 

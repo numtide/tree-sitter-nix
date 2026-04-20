@@ -365,7 +365,7 @@ module.exports = grammar({
         "(",
         field("expression", $._expression),
         ")",
-        field("attrs", $.inherited_attrs),
+        optional(field("attrs", $.inherited_attrs)),
         ";",
       ),
 
