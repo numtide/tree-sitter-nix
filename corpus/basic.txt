@@ -535,6 +535,19 @@ hpath_expression1
     (hpath_expression
         (path_fragment)))
 
+====================
+update vs path: a // b is update, not path
+====================
+
+a // b
+
+---
+
+(source_code
+    (binary_expression
+        (variable_expression (identifier))
+        (variable_expression (identifier))))
+
 
 ====================
 hpath_expression2
