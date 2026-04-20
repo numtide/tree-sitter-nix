@@ -1,16 +1,51 @@
 ;; https://tree-sitter.github.io/tree-sitter/4-code-navigation.html
+;;
+;; The Nix data model is "everything is an attrset of expressions";
+;; functions and values share the same binding form. We capture
+;; definitions broadly (any binding) and mark function-valued bindings
+;; as @definition.function specifically so GitHub's code-nav can
+;; distinguish them.
 
-;;Function definitions
+;; ----- Definitions -----
+
+;; Generic binding — any top-level or nested attrset attribute.
+;; Anchor @name to the LEAF of the attrpath so `foo.bar.baz = …`
+;; tags `baz` rather than the whole dotted path.
 (binding
-  attrpath: (attrpath attr: (identifier)) @name
-  expression: (function_expression) @definition.function)
-;;Function/method calls
-(apply_expression function: (apply_expression function: (variable_expression name: (identifier) @name)) @reference.call)
+  attrpath: (attrpath
+    attr: (identifier) @name .)
+  expression: (_)) @definition
 
-;; TODO: (if even applicable?)
-;;Interface definitions       @definition.interface
-;;Interface implementation    @reference.implementation
-;;Class definitions           @definition.class
-;;Class reference             @reference.class
-;;Method definitions          @definition.method
-;;Module definitions          @definition.module
+;; Function-valued bindings — `foo = x: …`.
+(binding
+  attrpath: (attrpath
+    attr: (identifier) @name .)
+  expression: (function_expression)) @definition.function
+
+;; inherit — definitions brought from another scope.
+(inherit
+  attrs: (inherited_attrs attr: (identifier) @name)) @definition
+(inherit_from
+  attrs: (inherited_attrs attr: (identifier) @name)) @definition
+
+;; ----- References -----
+
+;; Any bare identifier used as a value expression is a reference.
+(variable_expression
+  name: (identifier) @name) @reference
+
+;; Function application — the thing being called is a reference.call.
+(apply_expression
+  function: (variable_expression
+    name: (identifier) @name)) @reference.call
+
+;; Method-style call: `foo.bar.baz arg` — tag the leaf attrname.
+(apply_expression
+  function: (select_expression
+    attrpath: (attrpath
+      attr: (identifier) @name .))) @reference.call
+
+;; Attribute access (non-call) — `foo.bar.baz` lookup.
+(select_expression
+  attrpath: (attrpath
+    attr: (identifier) @name .)) @reference
