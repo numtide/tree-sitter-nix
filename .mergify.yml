@@ -1,8 +1,17 @@
+queue_rules:
+  - name: default
+    merge_conditions:
+      - check-success=buildbot/nix-eval
+
+defaults:
+  actions:
+    queue:
+      merge_method: rebase
+
 pull_request_rules:
-  - name: automatic merge for Renovate pull requests
+  - name: merge using the merge queue
     conditions:
-      - author=renovate[bot]
-      - check-success=all-checks-passed
+      - base=master
+      - label~=merge-queue|dependencies
     actions:
-      merge:
-        method: rebase
+      queue:

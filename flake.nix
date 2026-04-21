@@ -5,12 +5,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     flake-utils.url = "github:numtide/flake-utils";
-
-    nix-github-actions.url = "github:nix-community/nix-github-actions";
-    nix-github-actions.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix-github-actions }: (
+  outputs = { self, nixpkgs, flake-utils }: (
     (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -106,24 +103,6 @@
           exec ${pkgs.treefmt}/bin/treefmt --config-file ${./treefmt.toml} "$@"
         '';
 
-      })) // {
-
-      githubActions = nix-github-actions.lib.mkGithubMatrix {
-        # Inherit GHA actions matrix from a subset of platforms supported by hosted runners
-        platforms = {
-          "x86_64-linux" = "ubuntu-latest";
-          "x86_64-darwin" = "macos-15-intel";
-          "aarch64-darwin" = "macos-latest";
-          "aarch64-linux" = "ubuntu-24.04-arm";
-        };
-        checks = {
-          inherit (self.checks) x86_64-linux;
-
-          # Don't run linters on darwin as it's just scheduling overhead
-          x86_64-darwin = builtins.removeAttrs self.checks.x86_64-darwin [ "editorconfig" "generated-diff" "treefmt" ];
-        };
-      };
-
-    }
+      }))
   );
 }
