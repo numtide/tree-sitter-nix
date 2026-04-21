@@ -15,3 +15,7 @@ vendor/
 # Zig
 .zig-cache/
 zig-out/
+
+# OCaml
+_build/
+*.install
