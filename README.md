@@ -1,6 +1,8 @@
 # tree-sitter-nix
 
-[![Build Status](https://buildbot.numtide.com/badges/tree-sitter-nix.svg)](https://buildbot.numtide.com/#/projects/tree-sitter-nix)
+<img alt="tree-sitter-nix" src="https://banner.numtide.com/banner/numtide/tree-sitter-nix.svg">
+
+[![Support](https://img.shields.io/badge/Support-%23numtide-blue)](https://matrix.to/#/#numtide:numtide.com)
 
 A [tree-sitter](https://github.com/tree-sitter/tree-sitter) grammar for
 the [Nix](https://nixos.org/) expression language.
