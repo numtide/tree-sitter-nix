@@ -397,7 +397,7 @@ a ? ${b}.c."d"
             (string_expression (string_fragment)))))
 
 ====================
-apply_expressionlication
+apply_expression
 ====================
 
 a 1 2.0
