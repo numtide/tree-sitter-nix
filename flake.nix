@@ -62,6 +62,24 @@
                 };
               };
 
+            ocaml-bindings = pkgs.stdenv.mkDerivation {
+              pname = "tree-sitter-nix-ocaml";
+              version = "0.3.0";
+              src = self;
+              nativeBuildInputs = with pkgs.ocamlPackages; [
+                ocaml
+                dune_3
+                findlib
+              ];
+              buildPhase = ''
+                runHook preBuild
+                dune build bindings/ocaml
+                dune runtest bindings/ocaml
+                runHook postBuild
+              '';
+              installPhase = "touch $out";
+            };
+
           } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
             # Requires xcode
             node-bindings =

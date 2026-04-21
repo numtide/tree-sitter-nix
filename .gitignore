@@ -19,3 +19,4 @@ zig-out/
 # OCaml
 _build/
 *.install
+result

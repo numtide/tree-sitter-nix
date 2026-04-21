@@ -6,9 +6,7 @@
       "camelcase": "Nix",
       "title": "Nix",
       "scope": "source.nix",
-      "file-types": [
-        "nix"
-      ],
+      "file-types": ["nix"],
       "injection-regex": "^nix$",
       "tags": "queries/tags.scm",
       "highlights": "queries/highlights.scm",
