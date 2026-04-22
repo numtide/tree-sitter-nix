@@ -71,6 +71,11 @@
                 dune_3
                 findlib
               ];
+              # tree-sitter is a `buildInputs` dep so the compiler
+              # wrapper picks up its include/ and lib/ via NIX_CFLAGS_COMPILE
+              # and NIX_LDFLAGS — letting `#include <tree_sitter/api.h>` and
+              # `-ltree-sitter` resolve during the OCaml stubs compile + link.
+              buildInputs = [ pkgs.tree-sitter ];
               buildPhase = ''
                 runHook preBuild
                 dune build bindings/ocaml

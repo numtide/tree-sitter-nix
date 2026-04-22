@@ -1,63 +1,142 @@
 # OCaml bindings for tree-sitter-nix
 
-OCaml wrapper around the compiled Nix grammar. Exposes
-`tree_sitter_nix()` as an opaque pointer suitable for handing to any
-tree-sitter runtime that takes a `const TSLanguage *`.
+A **self-contained** OCaml library bundling:
 
-## Usage
+1. The compiled Nix grammar (`parser.c` + external scanner).
+2. A minimal OCaml wrapper around libtree-sitter's runtime (`Parser`,
+   `Tree`, `Node`).
 
-### With opam (once published)
+Consumers don't need `ocaml-tree-sitter-core` — they depend on
+`tree_sitter_nix` and immediately parse + walk Nix source.
+
+## Quickstart
+
+```ocaml
+let parser = Tree_sitter_nix.Parser.create () in
+let tree = Tree_sitter_nix.Parser.parse_string parser "{ hello = 42; }" in
+let root = Tree_sitter_nix.Tree.root_node tree in
+Printf.printf "root: %s (%d named children)\n"
+  (Tree_sitter_nix.Node.type_ root)
+  (Tree_sitter_nix.Node.named_child_count root)
+(* root: source_code (1 named children) *)
+```
+
+## Dependencies
+
+- **libtree-sitter** (the runtime C library) — on Nix, `pkgs.tree-sitter`
+  provides it at `$out/{include,lib}`. On Linux distros, install
+  the `tree-sitter` or `libtree-sitter` system package.
+- **`ocaml`** ≥ 4.14, **`dune`** ≥ 3.0.
+
+## Consuming this library
+
+### From a Nix flake
+
+```nix
+inputs.tree-sitter-nix.url = "github:numtide/tree-sitter-nix";
+
+# in your package derivation:
+buildDunePackage {
+  # ...
+  buildInputs = [
+    tree-sitter-nix.packages.${system}.tree-sitter-nix-ocaml
+    pkgs.tree-sitter  # runtime, for the -lm / -ltree-sitter link
+  ];
+}
+```
+
+### From opam (once published)
 
 ```sh
 opam install tree_sitter_nix
 ```
 
-### From this repo (local development)
+The package has a `depext` on the system `tree-sitter` library.
+
+### Building from this repo locally
 
 ```sh
-cd bindings/ocaml
+# In a shell that has tree-sitter headers on the C include path:
+nix develop
+dune build bindings/ocaml
+dune runtest bindings/ocaml   # runs the end-to-end test
+```
+
+If you're not in `nix develop`, set the include/link paths manually:
+
+```sh
+export C_INCLUDE_PATH=/path/to/tree-sitter/include
+export LIBRARY_PATH=/path/to/tree-sitter/lib
 dune build
-dune utop
 ```
 
+## API overview
+
+See [`tree_sitter_nix.mli`](./tree_sitter_nix.mli) for the full
+interface.
+
+| Module | Type | Notable operations |
+|--------|------|--------------------|
+| `Parser` | opaque, GC-managed | `create`, `parse_string` |
+| `Tree` | opaque, GC-managed | `root_node` |
+| `Node` | handle value | `type_`, `is_named`, `has_error`, `child_count`, `child`, `named_child`, `parent`, `field_name_for_child`, `start_byte`, `end_byte`, `text`, `iter_children`, `iter_named_children` |
+| (top-level) | — | `language : unit -> Obj.t` for ABI-level interop |
+
+The underlying C objects are freed automatically by OCaml's GC via
+custom-block finalizers. You don't need to call a close/destroy.
+
+## Example: extract attrset attribute names
+
 ```ocaml
-# let lang = Tree_sitter_nix.language () in
-  Printf.printf "got language: %b\n" (Obj.repr lang != Obj.repr ());;
-got language: true
-```
+let src = {|
+  {
+    hello = "world";
+    nested = { deeper = true; };
+  }
+|} in
+let parser = Tree_sitter_nix.Parser.create () in
+let tree = Tree_sitter_nix.Parser.parse_string parser src in
+let root = Tree_sitter_nix.Tree.root_node tree in
 
-### With [ocaml-tree-sitter-core](https://github.com/semgrep/ocaml-tree-sitter-core)
-
-This library only provides the `TSLanguage *` pointer. To actually
-parse a Nix source string you need a tree-sitter runtime wrapper. The
-ergonomic choice is Semgrep's `ocaml-tree-sitter-core`:
-
-```ocaml
-open Tree_sitter_bindings (* from ocaml-tree-sitter-core *)
-
-let lang = Tree_sitter_nix.language ()
-let tree = Tree_sitter_parsing.parse_string ~language:lang "{ a = 1; }"
+let rec walk node =
+  if Tree_sitter_nix.Node.type_ node = "binding" then
+    Tree_sitter_nix.Node.iter_children node (fun child ->
+      if Tree_sitter_nix.Node.type_ child = "attrpath" then
+        Tree_sitter_nix.Node.iter_children child (fun leaf ->
+          if Tree_sitter_nix.Node.type_ leaf = "identifier" then
+            Printf.printf "attr: %s\n" (Tree_sitter_nix.Node.text leaf ~src)));
+  Tree_sitter_nix.Node.iter_named_children node walk
+in
+walk root
+(* attr: hello
+   attr: nested
+   attr: deeper *)
 ```
 
 ## Build layout
 
-- `dune-project` — declares the OCaml package `tree_sitter_nix`.
-- `dune` — compiles `../../src/parser.c` + `../../src/scanner.c`
-  into a C library linked into an OCaml cma/cmxa.
-- `tree_sitter_nix.{ml,mli}` — the OCaml module with the `language()`
-  entry point.
-- `tree_sitter_nix_stubs.c` — C glue calling `tree_sitter_nix()` from
-  the compiled grammar and boxing the pointer for OCaml.
+- `dune-project` — workspace declaration (at repo root).
+- `tree_sitter_nix.opam` — generated opam package file.
+- `bindings/ocaml/dune` — library rule: compiles `../../src/{parser,scanner}.c`
+  and `tree_sitter_nix_stubs.c`; links `-ltree-sitter -lm`.
+- `bindings/ocaml/tree_sitter_nix.{ml,mli}` — OCaml API.
+- `bindings/ocaml/tree_sitter_nix_stubs.c` — C stubs for the language
+  function + minimal libtree-sitter runtime wrappers.
+- `bindings/ocaml/test/` — end-to-end test that parses a Nix snippet
+  and extracts attribute names via tree walking.
 
-## Regenerating on grammar change
+## Maintenance
 
-The parser sources (`../../src/parser.c`, `../../src/scanner.c`, and
-headers under `../../src/tree_sitter/`) are regenerated by the
-tree-sitter CLI via `npm run generate` or `tree-sitter generate
---abi 15` at the repo root. After that, `dune build` in this
-directory will pick up the new sources automatically.
+Unlike the c/go/python/swift/zig bindings (auto-generated by
+`tree-sitter init`), this binding is hand-written. The surface is
+small:
 
-Unlike the c / go / python / swift / zig bindings, the OCaml binding
-is hand-written (the tree-sitter CLI doesn't have an `ocaml` target
-in `tree-sitter init`). So if the C API of the generated grammar
-changes, the stubs in this directory may need manual updates.
+- ~60 lines OCaml (`tree_sitter_nix.ml`)
+- ~200 lines C stubs (`tree_sitter_nix_stubs.c`)
+- ~30 lines build glue (`dune`, `dune-project`)
+
+If libtree-sitter's C API changes (rare — it's been stable for years),
+the stubs file may need manual updates. If the grammar itself changes
+(new `grammar.js`), `npm run generate` or `tree-sitter generate --abi
+15` at the repo root refreshes `../../src/parser.c` and `dune build`
+picks it up automatically.

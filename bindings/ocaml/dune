@@ -11,12 +11,18 @@
    -I../../src/tree_sitter
    -fPIC)
   (include_dirs ../../src ../../src/tree_sitter))
- (c_library_flags -lm))
+ ;; libm is pulled in by scanner.c. libtree-sitter is linked in for the
+ ;; runtime API (ts_parser_*, ts_tree_*, ts_node_*).
+ ;;
+ ;; Callers must have libtree-sitter's headers on the C include path
+ ;; (e.g. via `nix develop`, or `CFLAGS="-I/path/to/tree-sitter/include"`
+ ;; for a manual opam build). Nixpkgs' `tree-sitter` derivation ships
+ ;; them at `$out/include/tree_sitter/api.h`.
+ (c_library_flags -ltree-sitter -lm))
 
-;; The grammar's generated parser and external scanner live in src/ at the
-;; repo root. dune's foreign_stubs expects sources alongside this dune file,
-;; so we symlink them via copy_files directives below. `-I../../src` above
-;; covers the tree_sitter/parser.h include path the sources need.
+;; The grammar's generated parser and external scanner live in src/ at
+;; the repo root. dune's foreign_stubs expects sources alongside this
+;; dune file, so we symlink them via copy_files directives below.
 
 (copy_files#
  (files ../../src/parser.c))
