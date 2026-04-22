@@ -102,6 +102,25 @@
     ]
   },
   {
+    "type": "comment",
+    "named": true,
+    "extra": true,
+    "subtypes": [
+      {
+        "type": "block_comment",
+        "named": true
+      },
+      {
+        "type": "doc_comment",
+        "named": true
+      },
+      {
+        "type": "line_comment",
+        "named": true
+      }
+    ]
+  },
+  {
     "type": "apply_expression",
     "named": true,
     "fields": {
@@ -1950,9 +1969,12 @@
     "named": false
   },
   {
-    "type": "comment",
-    "named": true,
-    "extra": true
+    "type": "block_comment",
+    "named": true
+  },
+  {
+    "type": "doc_comment",
+    "named": true
   },
   {
     "type": "dollar_escape",
@@ -1997,6 +2019,10 @@
   {
     "type": "let",
     "named": false
+  },
+  {
+    "type": "line_comment",
+    "named": true
   },
   {
     "type": "or",
