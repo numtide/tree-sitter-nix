@@ -1,4 +1,5 @@
 (comment) @comment
+(doc_comment) @comment.documentation
 
 [
   "if"

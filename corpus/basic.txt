@@ -25,6 +25,29 @@ This is also a comment.
 (source_code (comment) (comment) (comment) (string_expression (string_fragment)))
 
 ====================
+comment subtypes
+====================
+
+# line
+/* block */
+/** doc */
+/**/
+/***/
+/**foo*/
+1
+
+---
+
+(source_code
+    (line_comment)
+    (block_comment)
+    (doc_comment)
+    (block_comment)
+    (block_comment)
+    (doc_comment)
+    (integer_expression))
+
+====================
 identifier
 ====================
 

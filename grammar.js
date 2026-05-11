@@ -26,7 +26,7 @@ module.exports = grammar({
 
   extras: ($) => [/\s/, $.comment],
 
-  supertypes: ($) => [$._expression],
+  supertypes: ($) => [$._expression, $.comment],
 
   inline: ($) => [],
 
@@ -402,8 +402,31 @@ module.exports = grammar({
     list_expression: ($) =>
       seq("[", repeat(field("element", $._expr_select_expression)), "]"),
 
-    comment: ($) =>
-      token(choice(seq("#", /.*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"))),
+    // `comment` is a supertype (see `supertypes` above) covering all three
+    // Nix comment forms. Consumers matching `(comment)` in queries keep
+    // working; consumers introspecting node-type strings now see one of
+    // `line_comment`, `block_comment`, `doc_comment`.
+    //
+    // Regex shapes are taken verbatim from Nix's own flex lexer
+    // (`src/libexpr/lexer.l`) so edge cases match the reference parser:
+    //   - `/**/`  → block_comment (empty long comment)
+    //   - `/***/` → block_comment (three-star long comment, NOT doc)
+    //   - `/** */` → doc_comment (RFC 145)
+    //   - `/**foo*/` → doc_comment (first body char after `/**` must not
+    //     be `/` or `*`)
+    comment: ($) => choice($.line_comment, $.block_comment, $.doc_comment),
+
+    line_comment: ($) => token(seq("#", /.*/)),
+
+    // Long/block comment. Body is `([^*]|\*+[^*/])*\*+` per Nix's lexer.l.
+    block_comment: ($) => token(seq("/*", /([^*]|\*+[^*\/])*\*+/, "/")),
+
+    // Doc comment. Nix's lexer requires the first body char after `/**`
+    // to be neither `/` nor `*` — this excludes `/**/` and `/***/` from
+    // being doc comments. Precedence 1 so the longer `/**...*/` match
+    // wins over `block_comment` on the shared `/*...*/` prefix.
+    doc_comment: ($) =>
+      token(prec(1, seq("/**", /[^\/*]([^*]|\*+[^*\/])*\*+/, "/"))),
   },
 });
 
