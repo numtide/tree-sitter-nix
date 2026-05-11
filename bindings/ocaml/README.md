@@ -75,12 +75,12 @@ dune build
 See [`tree_sitter_nix.mli`](./tree_sitter_nix.mli) for the full
 interface.
 
-| Module | Type | Notable operations |
-|--------|------|--------------------|
-| `Parser` | opaque, GC-managed | `create`, `parse_string` |
-| `Tree` | opaque, GC-managed | `root_node` |
-| `Node` | handle value | `type_`, `is_named`, `has_error`, `child_count`, `child`, `named_child`, `parent`, `field_name_for_child`, `start_byte`, `end_byte`, `text`, `iter_children`, `iter_named_children` |
-| (top-level) | — | `language : unit -> Obj.t` for ABI-level interop |
+| Module      | Type               | Notable operations                                                                                                                                                                  |
+| ----------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Parser`    | opaque, GC-managed | `create`, `parse_string`                                                                                                                                                            |
+| `Tree`      | opaque, GC-managed | `root_node`                                                                                                                                                                         |
+| `Node`      | handle value       | `type_`, `is_named`, `has_error`, `child_count`, `child`, `named_child`, `parent`, `field_name_for_child`, `start_byte`, `end_byte`, `text`, `iter_children`, `iter_named_children` |
+| (top-level) | —                  | `language : unit -> Obj.t` for ABI-level interop                                                                                                                                    |
 
 The underlying C objects are freed automatically by OCaml's GC via
 custom-block finalizers. You don't need to call a close/destroy.

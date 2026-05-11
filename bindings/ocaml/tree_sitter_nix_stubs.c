@@ -216,8 +216,8 @@ CAMLprim value caml_ts_node_parent(value node_v) {
 CAMLprim value caml_ts_node_field_name_for_child(value node_v, value idx_v) {
   CAMLparam2(node_v, idx_v);
   CAMLlocal1(result);
-  const char *name = ts_node_field_name_for_child(*Node_val(node_v),
-                                                  (uint32_t)Int_val(idx_v));
+  const char *name =
+      ts_node_field_name_for_child(*Node_val(node_v), (uint32_t)Int_val(idx_v));
   if (!name) {
     result = Val_int(0); /* None */
   } else {
