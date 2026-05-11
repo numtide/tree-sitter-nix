@@ -8,9 +8,22 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- OCaml bindings as a hand-written dune package under `bindings/ocaml/`,
-  exposing `Tree_sitter_nix.language : unit -> Obj.t`. Ready for
-  `semgrep/ocaml-tree-sitter-core` consumers. [#40]
+- OCaml bindings under `bindings/ocaml/` — hand-written dune package
+  with a self-contained libtree-sitter runtime wrapper (`Parser`,
+  `Tree`, `Node` modules). No dependency on ocaml-tree-sitter-core.
+  [#40]
+
+## [0.4.0] — 2026-05-11
+
+### Added
+
+- Comment subtypes: `comment` is now a supertype covering `line_comment`
+  (`# …`), `block_comment` (`/* … */`), and `doc_comment` (`/** … */`,
+  RFC 145 / nixdoc). Existing queries targeting `(comment)` continue to
+  match all three via the supertype; consumers that compare node-type
+  strings will see the concrete type. Regex shapes lifted from Nix's own
+  flex lexer so edge cases (`/**/`, `/***/`) classify identically. Also
+  adds `(doc_comment) @comment.documentation` in `highlights.scm`. [#45]
 - Zig bindings (`bindings/zig/`, `build.zig`, `build.zig.zon`) via
   `tree-sitter init` with `zig: true` in `tree-sitter.json`. [#39]
 - C, Go, Python, Swift bindings materialized under `bindings/`; previously
@@ -86,13 +99,21 @@ follow [Semantic Versioning](https://semver.org/).
   `escape_sequence` regex, fixed `apply_expressionlication` corpus
   typo. [#41]
 
+### Changed (CI / tooling)
+
+- CI migrated from GitHub Actions flake matrix to
+  buildbot.numtide.com. All `flake.nix` checks are consumed by
+  buildbot-nix directly; the GHA wrapper and `nix-github-actions`
+  flake input were removed. `publish.yml` remains on GHA for
+  tag-driven crates.io releases. [#43]
+
 ### Documentation
 
 - README refreshed with install instructions per ecosystem, editor
   integration notes, development workflow, and release cadence.
 - This CHANGELOG started.
-- [`bindings/ocaml/README.md`](bindings/ocaml/README.md) — OCaml
-  consumer guide with `ocaml-tree-sitter-core` integration snippet.
+- `docs/highlight-groups.md` — reference list of every `@capture`
+  name `queries/highlights.scm` produces, for theme authors.
 
 [#1]: https://github.com/numtide/tree-sitter-nix/pull/1
 [#2]: https://github.com/numtide/tree-sitter-nix/pull/2
@@ -116,6 +137,8 @@ follow [Semantic Versioning](https://semver.org/).
 [#39]: https://github.com/numtide/tree-sitter-nix/pull/39
 [#40]: https://github.com/numtide/tree-sitter-nix/pull/40
 [#41]: https://github.com/numtide/tree-sitter-nix/pull/41
+[#43]: https://github.com/numtide/tree-sitter-nix/pull/43
+[#45]: https://github.com/numtide/tree-sitter-nix/pull/45
 
 ## [0.3.0] — 2025-08-12 (upstream)
 
