@@ -414,14 +414,12 @@ module.exports = grammar({
     //   - `/** */` → doc_comment (RFC 145)
     //   - `/**foo*/` → doc_comment (first body char after `/**` must not
     //     be `/` or `*`)
-    comment: ($) =>
-      choice($.line_comment, $.block_comment, $.doc_comment),
+    comment: ($) => choice($.line_comment, $.block_comment, $.doc_comment),
 
     line_comment: ($) => token(seq("#", /.*/)),
 
     // Long/block comment. Body is `([^*]|\*+[^*/])*\*+` per Nix's lexer.l.
-    block_comment: ($) =>
-      token(seq("/*", /([^*]|\*+[^*\/])*\*+/, "/")),
+    block_comment: ($) => token(seq("/*", /([^*]|\*+[^*\/])*\*+/, "/")),
 
     // Doc comment. Nix's lexer requires the first body char after `/**`
     // to be neither `/` nor `*` — this excludes `/**/` and `/***/` from

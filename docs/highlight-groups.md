@@ -12,9 +12,9 @@ which Helix and most other tree-sitter consumers also recognise.
 
 ### Comments
 
-| Capture                  | Matches                                                                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `@comment`               | Any comment. `comment` is a supertype covering `line_comment` (`# …`), `block_comment` (`/* … */`), and `doc_comment` (`/** … */`) |
+| Capture                  | Matches                                                                                                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@comment`               | Any comment. `comment` is a supertype covering `line_comment` (`# …`), `block_comment` (`/* … */`), and `doc_comment` (`/** … */`)                                    |
 | `@comment.documentation` | Specifically `doc_comment` (`/** … */`). Fires in addition to `@comment` so themes that care can distinguish; themes that don't just render both as a regular comment |
 
 ### Keywords and operators
