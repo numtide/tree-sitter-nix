@@ -4,73 +4,84 @@ This is an exhaustive list of the `@capture` names that
 `queries/highlights.scm` produces. Editor theme authors can use this to
 ensure every capture has a colour mapping.
 
-Conventions follow [nvim-treesitter's highlight group
-catalog](https://neovim.io/doc/user/treesitter.html#treesitter-highlight-groups),
-which Helix and most other tree-sitter consumers also recognise.
+As of **v0.5.0**, conventions align with the
+[nvim-treesitter highlight group catalog](https://neovim.io/doc/user/treesitter.html#treesitter-highlight-groups),
+which Helix and most other tree-sitter consumers also recognise. The
+archived nvim-treesitter's vendored `runtime/queries/nix/` used these
+names — our queries are now directly interchangeable.
 
 ## Captures by category
 
 ### Comments
 
-| Capture                  | Matches                                                                                                                                                               |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@comment`               | Any comment. `comment` is a supertype covering `line_comment` (`# …`), `block_comment` (`/* … */`), and `doc_comment` (`/** … */`)                                    |
-| `@comment.documentation` | Specifically `doc_comment` (`/** … */`). Fires in addition to `@comment` so themes that care can distinguish; themes that don't just render both as a regular comment |
+| Capture                  | Matches                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `@comment`               | Any comment. `comment` is a supertype covering `line_comment` (`# …`), `block_comment` (`/* … */`), and `doc_comment` (`/** … */`) |
+| `@comment.documentation` | Specifically `doc_comment` (`/** … */`). Fires in addition to `@comment` so themes that care can distinguish                       |
+| `@spell`                 | Applied to comments so nvim's treesitter spellcheck covers them                                                                    |
 
-### Keywords and operators
+### Keywords
 
-| Capture     | Matches                                                            |
-| ----------- | ------------------------------------------------------------------ |
-| `@keyword`  | `if` `then` `else` `let` `inherit` `in` `rec` `with` `assert` `or` |
-| `@operator` | Binary and unary expression operators                              |
+| Capture                | Matches                                              |
+| ---------------------- | ---------------------------------------------------- |
+| `@keyword`             | `assert` `in` `inherit` `let` `rec` `with`           |
+| `@keyword.conditional` | `if` `then` `else`                                   |
+| `@keyword.operator`    | `or` (the `a.b or c` field-access default separator) |
+| `@keyword.import`      | `import` in expression position                      |
+| `@keyword.exception`   | `abort`, `throw`                                     |
 
 ### Literals
 
-| Capture                | Matches                                                                  |
-| ---------------------- | ------------------------------------------------------------------------ |
-| `@number`              | `(integer_expression)` and `(float_expression)`                          |
-| `@string`              | `(string_expression)` and `(indented_string_expression)`                 |
-| `@escape`              | Escape sequences inside strings (`\n`, `\\`, `\"`, etc.) and `$` escapes |
-| `@string.special.path` | `(path_expression)` / `(hpath_expression)` / `(spath_expression)`        |
-| `@string.special.uri`  | `(uri_expression)`                                                       |
+| Capture                | Matches                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `@number`              | `(integer_expression)`                                                                                                         |
+| `@number.float`        | `(float_expression)`                                                                                                           |
+| `@boolean`             | `true`, `false`                                                                                                                |
+| `@constant.builtin`    | `null`, `builtins`, `__curPos`, `__currentSystem`, `__currentTime`, `__langVersion`, `__nixPath`, `__nixVersion`, `__storeDir` |
+| `@string`              | `(string_expression)` and `(indented_string_expression)`                                                                       |
+| `@string.escape`       | Escape sequences inside strings (`\n`, `\\`, `\"`, etc.) and `$` escapes                                                       |
+| `@string.special.path` | `(path_expression)` / `(hpath_expression)` / `(spath_expression)`                                                              |
+| `@string.special.url`  | `(uri_expression)`                                                                                                             |
 
 ### Identifiers
 
-| Capture               | Matches                                                                                                                                                                                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@variable`           | Identifiers used as value references (filtered via `#not-match?` against the builtin list)                                                                                                                                                                            |
-| `@variable.builtin`   | Builtins that resolve to values: `builtins`, `true`, `false`, `null`, `__curPos`, `__currentSystem`, `__currentTime`, `__langVersion`, `__nixPath`, `__nixVersion`, `__storeDir`                                                                                      |
-| `@variable.parameter` | Function parameters — the universal `x` in `x: ...` and `formal.name` inside `{ a, b }: ...`                                                                                                                                                                          |
-| `@function`           | The function being applied in an `(apply_expression)` — both `foo` in `foo x` and `foo.bar` in `foo.bar x`                                                                                                                                                            |
-| `@function.builtin`   | Builtins that resolve to callables in apply position: `__add`, `__map`, `derivation`, `import`, `abort`, `throw`, `fetchGit`, `fetchTarball`, `fetchTree`, `baseNameOf`, `dirOf`, and ~80 other `__`-prefixed builtin functions (full list in `highlights.scm` regex) |
-| `@property`           | Attribute names in `(binding)`, `(select_expression attrpath)`, `(inherit)`, `(inherit_from)`                                                                                                                                                                         |
+| Capture                       | Matches                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `@variable`                   | Any identifier not matched by a more specific rule                                            |
+| `@variable.parameter`         | Function parameters — `x` in `x: ...`, `formal.name` in `{ a, b }: ...`                       |
+| `@variable.parameter.builtin` | The `...` ellipsis in formals                                                                 |
+| `@variable.member`            | Attribute names in `(binding)`, `(select_expression attrpath)`, `(inherit)`, `(inherit_from)` |
+| `@function`                   | Function definitions — `f` in `f = x: ...`                                                    |
+| `@function.call`              | The thing being applied in `(apply_expression)`                                               |
+| `@function.builtin`           | Known builtins in apply position, and any `builtins.*` attribute                              |
 
-### Punctuation
+### Operators and punctuation
 
-| Capture                  | Matches                                       |
-| ------------------------ | --------------------------------------------- |
-| `@punctuation.delimiter` | `;` `.` `,` `=` and the `?` in formal-default |
-| `@punctuation.bracket`   | `(` `)` `[` `]` `{` `}`                       |
-| `@punctuation.special`   | `${` and `}` that open/close interpolation    |
+| Capture                  | Matches                                     |
+| ------------------------ | ------------------------------------------- |
+| `@operator`              | Binary/unary expression operators, `=`, `@` |
+| `@punctuation.delimiter` | `;` `.` `,` and the `?` in formal-default   |
+| `@punctuation.bracket`   | `(` `)` `[` `]` `{` `}`                     |
+| `@punctuation.special`   | `${` and `}` that open/close interpolation  |
 
-### Interpolation
+## Renames from v0.4.x and earlier
 
-| Capture     | Matches                                                                              |
-| ----------- | ------------------------------------------------------------------------------------ |
-| `@embedded` | The expression body inside `${...}` (rendered according to its own language's theme) |
+| Old (≤ v0.4.x)                                        | New (≥ v0.5.0)                                 |
+| ----------------------------------------------------- | ---------------------------------------------- |
+| `@escape`                                             | `@string.escape`                               |
+| `@string.special.uri`                                 | `@string.special.url`                          |
+| `@keyword` (flat, for `if`/`then`/`else`)             | `@keyword.conditional`                         |
+| `@keyword` (flat, for `or`)                           | `@keyword.operator`                            |
+| `@variable.builtin` (for `true`/`false`)              | `@boolean`                                     |
+| `@variable.builtin` (for `null`, `builtins`, `__*`)   | `@constant.builtin`                            |
+| `@function.builtin` (covers `import`/`abort`/`throw`) | `@keyword.import` / `@keyword.exception`       |
+| `@function` (for apply functions)                     | `@function.call`                               |
+| `@property` (for attrset keys)                        | `@variable.member`                             |
+| `@embedded` (interpolation content)                   | removed (injected language's theme takes over) |
 
-## Expected divergence from nvim-treesitter's default style
-
-Nvim-treesitter keeps evolving capture naming conventions:
-
-- We currently use `@escape`, but nvim-treesitter newer-style is
-  `@string.escape`. Both render via similar theme mappings; consumers
-  that care can define the alias.
-- We emit `@string.special.uri`; nvim-treesitter master uses
-  `@string.special.url`. Minor string semantics difference, both work.
-
-Moving to the newer names is tracked as an independent follow-up so the
-diff stays inspectable for downstream theme maintainers.
+Theme authors targeting the old names should add fallback mappings
+(e.g. alias `@escape` → `@string.escape`). Most modern tree-sitter
+theme distributions already map both forms.
 
 ## How the queries are loaded
 
