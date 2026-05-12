@@ -18,7 +18,7 @@ consumers (ABI 15, tree-sitter ≥ 0.26).
 - **Grammar** — `grammar.js` + a custom C scanner for strings / paths /
   interpolation edge cases (`src/scanner.c`).
 - **Queries** — `queries/highlights.scm`, `injections.scm`, `locals.scm`,
-  `tags.scm`, `indents.scm`, all used by editors that consume tree-sitter.
+  `tags.scm`, `indents.scm`, `folds.scm`, all used by editors that consume tree-sitter.
 - **Language bindings** under `bindings/`:
   - `c` — header + pkg-config template
   - `go` — cgo wrapper

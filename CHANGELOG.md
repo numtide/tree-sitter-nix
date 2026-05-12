@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `queries/folds.scm` — fold ranges matching nvim-treesitter's vendored
+  Nix fold set (attrsets, lists, indented strings, let/with/if
+  expressions, function bodies), plus `let_attrset_expression`,
+  `block_comment`, and `doc_comment`. Also exposed as
+  `tree_sitter_nix.FOLDS_QUERY` in the Python binding. [#49]
 - OCaml bindings under `bindings/ocaml/` — hand-written dune package
   with a self-contained libtree-sitter runtime wrapper (`Parser`,
   `Tree`, `Node` modules). No dependency on ocaml-tree-sitter-core.
@@ -158,6 +163,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#43]: https://github.com/numtide/tree-sitter-nix/pull/43
 [#45]: https://github.com/numtide/tree-sitter-nix/pull/45
 [#48]: https://github.com/numtide/tree-sitter-nix/pull/48
+[#49]: https://github.com/numtide/tree-sitter-nix/pull/49
 
 ## [0.3.0] — 2025-08-12 (upstream)
 
