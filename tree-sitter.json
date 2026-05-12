@@ -35,6 +35,7 @@
     "python": true,
     "rust": true,
     "swift": true,
-    "zig": true
+    "zig": true,
+    "ocaml": true
   }
 }
