@@ -4,38 +4,32 @@
 ; — every region is an expression. The folds below cover the
 ; expression forms that are commonly multi-line in real Nix code.
 ;
-; Convention follows nvim-treesitter / Helix: each captured node's full
-; range becomes a fold region. Editors typically trim the first line so
-; the opening token stays visible.
+; Capture set matches nvim-treesitter's vendored `runtime/queries/nix/
+; folds.scm`, plus the three additions noted at the bottom.
+;
+; Editors compute fold regions from each captured node's range.
+; nvim-treesitter and Zed filter to multi-line spans automatically;
+; single-line captures are harmless. (Helix does not currently consume
+; tree-sitter fold queries — it computes folds from tree structure
+; directly.)
 
 [
-  ; Bracketed expression scopes.
+  (if_expression)
+  (with_expression)
+  (let_expression)
+  (function_expression)
   (attrset_expression)
   (rec_attrset_expression)
-  (let_attrset_expression)
   (list_expression)
-  (parenthesized_expression)
-  (formals)
-
-  ; Long literal forms.
   (indented_string_expression)
-  (string_expression)
-
-  ; Binding-bearing expressions — `let … in …`, `with …; …`, `if … then
-  ; … else …`. These are often the biggest single regions in a flake.
-  (let_expression)
-  (with_expression)
-  (if_expression)
-  (assert_expression)
-
-  ; Function bodies.
-  (function_expression)
-
-  ; Long apply chains (e.g. derivation calls with many positional args).
-  (apply_expression)
 ] @fold
 
-; Comments — fold long block / doc comments, but not single-line ones.
+; Additions over the nvim-treesitter reference set ---------------------
+
+; let { ... } legacy attrset.
+(let_attrset_expression) @fold
+
+; Multi-line block / doc comments.
 [
   (block_comment)
   (doc_comment)
