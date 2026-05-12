@@ -68,14 +68,38 @@ module.exports = grammar({
         ),
       ),
 
+    // Home path. Inspired by Nix's lexer.l, which has two productions:
+    //   HPATH       \~(\/{PATH_CHAR}+)+\/?    e.g. ~/.config
+    //   HPATH_START \~\/                       used for ~/${...}
+    // The second lets a home path begin with `~/` directly followed by
+    // interpolation. We mirror the spirit (not the exact regex shapes —
+    // tree-sitter's lexer is generated, not hand-rolled flex) with two
+    // alternatives: `~/` + path chars, or a bare `~/` literal followed
+    // by mandatory interpolation. Tree-sitter's maximal-munch
+    // tokenisation disambiguates: `~/foo` matches the longer regex,
+    // `~/${...}` matches the bare literal.
     _hpath_start: ($) => /\~\/[a-zA-Z0-9\._\-\+\/]+/,
     hpath_expression: ($) =>
-      seq(
-        alias($._hpath_start, $.path_fragment),
-        repeat(
-          choice(
-            $.path_fragment,
-            alias($._immediate_interpolation, $.interpolation),
+      choice(
+        // ~/<path-chars> [<frag-or-interp>...]
+        seq(
+          alias($._hpath_start, $.path_fragment),
+          repeat(
+            choice(
+              $.path_fragment,
+              alias($._immediate_interpolation, $.interpolation),
+            ),
+          ),
+        ),
+        // ~/${...} [<frag-or-interp>...]   (bare hpath start + interpolation)
+        seq(
+          alias("~/", $.path_fragment),
+          alias($._immediate_interpolation, $.interpolation),
+          repeat(
+            choice(
+              $.path_fragment,
+              alias($._immediate_interpolation, $.interpolation),
+            ),
           ),
         ),
       ),
