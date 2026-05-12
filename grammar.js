@@ -197,7 +197,42 @@ module.exports = grammar({
         field("alternative", $._expression),
       ),
 
+    // Operator-expression hierarchy.
+    //
+    // Equality (`==`, `!=`) and comparison (`<`, `<=`, `>`, `>=`) are
+    // *non-associative* in Nix's bison grammar:
+    //
+    //   %nonassoc EQ NEQ              # one tier
+    //   %nonassoc '<' '>' LEQ GEQ     # higher tier
+    //
+    // Tree-sitter's `prec()` does not enforce non-associativity, so we
+    // encode it structurally with two intermediate hidden rules:
+    //
+    //   _expr_op           — anything, including equality/comparison
+    //   _expr_op_no_eq     — excludes equality (== !=)
+    //   _expr_op_no_cmp    — excludes both equality AND comparison
+    //
+    // An equality's operands are `_expr_op_no_eq` (so `a == b == c`
+    // errors but `a == b < c` parses, since `<` is a tier above).
+    // A comparison's operands are `_expr_op_no_cmp` (so `a < b < c`
+    // errors).
+    //
+    // Both rules alias to `binary_expression` so the public AST node
+    // type is unchanged. To chain comparisons, parenthesize:
+    // `(a == b) == c`.
     _expr_op: ($) =>
+      choice(
+        alias($._equality_expression, $.binary_expression),
+        $._expr_op_no_eq,
+      ),
+
+    _expr_op_no_eq: ($) =>
+      choice(
+        alias($._comparison_expression, $.binary_expression),
+        $._expr_op_no_cmp,
+      ),
+
+    _expr_op_no_cmp: ($) =>
       choice(
         $.has_attr_expression,
         $.unary_expression,
@@ -234,16 +269,54 @@ module.exports = grammar({
         ),
       ),
 
-    binary_expression: ($) =>
+    // Equality (`==`, `!=`) — operands exclude equality.
+    // `prec.left` only resolves the LR-table shift/reduce conflict at
+    // generate time; it does not change the language accepted.
+    _equality_expression: ($) =>
       choice(
-        // left assoc.
         ...[
           ["==", PREC.eq],
           ["!=", PREC.neq],
+        ].map(([operator, precedence]) =>
+          prec.left(
+            precedence,
+            seq(
+              field("left", $._expr_op_no_eq),
+              field("operator", operator),
+              field("right", $._expr_op_no_eq),
+            ),
+          ),
+        ),
+      ),
+
+    // Comparison (`<`, `<=`, `>`, `>=`) — operands exclude both
+    // equality and comparison.
+    _comparison_expression: ($) =>
+      choice(
+        ...[
           ["<", PREC["<"]],
           ["<=", PREC.leq],
           [">", PREC[">"]],
           [">=", PREC.geq],
+        ].map(([operator, precedence]) =>
+          prec.left(
+            precedence,
+            seq(
+              field("left", $._expr_op_no_cmp),
+              field("operator", operator),
+              field("right", $._expr_op_no_cmp),
+            ),
+          ),
+        ),
+      ),
+
+    // Associative operators (left or right). Operands are the full
+    // `_expr_op` so they CAN be comparison expressions, e.g.
+    // `a == b && c == d`.
+    binary_expression: ($) =>
+      choice(
+        // left assoc.
+        ...[
           ["&&", PREC.and],
           ["||", PREC.or],
           ["|>", PREC.piper],

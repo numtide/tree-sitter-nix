@@ -18,7 +18,8 @@ attrset typing field
       (binding
         (attrpath
           (identifier))
-        (string_expression (string_fragment)))
+        (string_expression
+          (string_fragment)))
       (binding
         (attrpath
           (identifier))
@@ -34,7 +35,8 @@ attrset typing field
           (identifier))
         (function_expression
           (identifier)
-          (variable_expression (identifier)))))))
+          (variable_expression
+            (identifier)))))))
 
 ================================================================================
 attrset typing field following string
@@ -58,13 +60,15 @@ attrset typing field following string
           (identifier)
           (identifier)
           (identifier))
-        (string_expression (string_fragment)))
+        (string_expression
+          (string_fragment)))
       (binding
         (attrpath
           (identifier)
           (identifier)
           (identifier))
-        (string_expression (string_fragment))))))
+        (string_expression
+          (string_fragment))))))
 
 ================================================================================
 attrset typing attrpath
@@ -86,7 +90,8 @@ attrset typing attrpath
       (binding
         (attrpath
           (identifier))
-        (string_expression (string_fragment)))
+        (string_expression
+          (string_fragment)))
       (binding
         (attrpath
           (identifier))
@@ -103,7 +108,8 @@ attrset typing attrpath
           (identifier))
         (function_expression
           (identifier)
-          (variable_expression (identifier)))))))
+          (variable_expression
+            (identifier)))))))
 
 ================================================================================
 attrset missing value
@@ -125,7 +131,8 @@ attrset missing value
       (binding
         (attrpath
           (identifier))
-        (string_expression (string_fragment)))
+        (string_expression
+          (string_fragment)))
       (binding
         (attrpath
           (identifier))
@@ -134,7 +141,8 @@ attrset missing value
         (attrpath
           (identifier))
         (apply_expression
-          (variable_expression (identifier))
+          (variable_expression
+            (identifier))
           (ERROR)
           (attrset_expression)))
       (binding
@@ -142,7 +150,8 @@ attrset missing value
           (identifier))
         (function_expression
           (identifier)
-          (variable_expression (identifier)))))))
+          (variable_expression
+            (identifier)))))))
 
 ================================================================================
 bind typing parenthesis
@@ -164,7 +173,8 @@ bind typing parenthesis
       (binding
         (attrpath
           (identifier))
-        (string_expression (string_fragment)))
+        (string_expression
+          (string_fragment)))
       (binding
         (attrpath
           (identifier))
@@ -174,17 +184,22 @@ bind typing parenthesis
       (binding
         (attrpath
           (identifier))
-        (ERROR
+        (parenthesized_expression
           (function_expression
             (identifier)
-            (variable_expression (identifier))))
-        (attrset_expression))
+            (apply_expression
+              (variable_expression
+                (identifier))
+              (ERROR)
+              (attrset_expression)))
+          (MISSING ")")))
       (binding
         (attrpath
           (identifier))
         (function_expression
           (identifier)
-          (variable_expression (identifier)))))))
+          (variable_expression
+            (identifier)))))))
 
 ================================================================================
 let typing field
@@ -206,7 +221,8 @@ in {}
       (binding
         (attrpath
           (identifier))
-        (string_expression (string_fragment)))
+        (string_expression
+          (string_fragment)))
       (binding
         (attrpath
           (identifier))
@@ -222,7 +238,8 @@ in {}
           (identifier))
         (function_expression
           (identifier)
-          (variable_expression (identifier)))))
+          (variable_expression
+            (identifier)))))
     (attrset_expression)))
 
 ================================================================================
@@ -246,7 +263,8 @@ in
       (binding
         (attrpath
           (identifier))
-        (string_expression (string_fragment)))
+        (string_expression
+          (string_fragment)))
       (binding
         (attrpath
           (identifier))
@@ -255,7 +273,8 @@ in
         (attrpath
           (identifier))
         (apply_expression
-          (variable_expression (identifier))
+          (variable_expression
+            (identifier))
           (ERROR)
           (attrset_expression)))
       (binding
@@ -263,5 +282,7 @@ in
           (identifier))
         (function_expression
           (identifier)
-          (variable_expression (identifier)))))
-    (variable_expression (identifier))))
+          (variable_expression
+            (identifier)))))
+    (variable_expression
+      (identifier))))

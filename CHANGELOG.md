@@ -20,11 +20,22 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Equality (`==`, `!=`) and comparison (`<`, `<=`, `>`, `>=`) are now
+  non-associative, matching Nix's `%nonassoc` declarations. Chained
+  expressions like `1 == 2 == 3` and `1 < 2 < 3` are now parse errors
+  (as in Nix); cross-tier mixing like `1 == 2 < 3` and parenthesized
+  chains like `(1 == 2) == 3` continue to parse. The public AST node
+  type is still `binary_expression`. [#51]
 - Home paths with leading interpolation (`~/${x}`, `~/${x}/config`)
   now parse. The previous `_hpath_start` regex required at least one
   path char after `~/`, so it could not stop before `${`. The new
   rule mirrors Nix's lexer.l, which has a separate `HPATH_START`
   production for exactly this case. [#50]
+- Corpus tests now actually run. `corpus/` was at the repo root but
+  tree-sitter ≥0.25 only looks for `test/corpus/`, so the corpus
+  tests had been silently skipped since the ABI 13→15 upgrade. Moved
+  to `test/corpus/`; latent failures (stale node names from #45)
+  fixed. [#50]
 
 ### Changed (BREAKING for theme consumers)
 
@@ -173,6 +184,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#48]: https://github.com/numtide/tree-sitter-nix/pull/48
 [#49]: https://github.com/numtide/tree-sitter-nix/pull/49
 [#50]: https://github.com/numtide/tree-sitter-nix/pull/50
+[#51]: https://github.com/numtide/tree-sitter-nix/pull/51
 
 ## [0.3.0] — 2025-08-12 (upstream)
 

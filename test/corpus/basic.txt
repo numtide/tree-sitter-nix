@@ -831,6 +831,67 @@ pipe operators
       (identifier))))
 
 ====================
+chained equality is a syntax error (matches Nix's %nonassoc)
+====================
+
+1 == 2 == 3
+
+---
+
+(source_code
+  (binary_expression
+    (integer_expression)
+    (integer_expression))
+  (ERROR
+    (integer_expression)))
+
+====================
+chained comparison is a syntax error (matches Nix's %nonassoc)
+====================
+
+1 < 2 < 3
+
+---
+
+(source_code
+  (binary_expression
+    (integer_expression)
+    (integer_expression))
+  (ERROR
+    (integer_expression)))
+
+====================
+mixed equality/comparison is valid (different prec tiers)
+====================
+
+1 == 2 < 3
+
+---
+
+(source_code
+  (binary_expression
+    (integer_expression)
+    (binary_expression
+      (integer_expression)
+      (integer_expression))))
+
+====================
+parenthesized chained comparison is valid
+====================
+
+(1 == 2) == 3
+
+---
+
+(source_code
+  (binary_expression
+    (parenthesized_expression
+      (binary_expression
+        (integer_expression)
+        (integer_expression)))
+    (integer_expression)))
+
+====================
 parens
 ====================
 
