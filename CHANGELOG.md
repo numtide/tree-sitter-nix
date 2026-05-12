@@ -18,6 +18,14 @@ follow [Semantic Versioning](https://semver.org/).
   `Tree`, `Node` modules). No dependency on ocaml-tree-sitter-core.
   [#40]
 
+### Fixed
+
+- Home paths with leading interpolation (`~/${x}`, `~/${x}/config`)
+  now parse. The previous `_hpath_start` regex required at least one
+  path char after `~/`, so it could not stop before `${`. The new
+  rule mirrors Nix's lexer.l, which has a separate `HPATH_START`
+  production for exactly this case. [#50]
+
 ### Changed (BREAKING for theme consumers)
 
 - `highlights.scm` capture names modernized to align with
@@ -164,6 +172,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#45]: https://github.com/numtide/tree-sitter-nix/pull/45
 [#48]: https://github.com/numtide/tree-sitter-nix/pull/48
 [#49]: https://github.com/numtide/tree-sitter-nix/pull/49
+[#50]: https://github.com/numtide/tree-sitter-nix/pull/50
 
 ## [0.3.0] — 2025-08-12 (upstream)
 

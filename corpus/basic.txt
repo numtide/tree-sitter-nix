@@ -590,6 +590,35 @@ hpath_expression2
             (integer_expression))))
 
 ====================
+hpath_expression with leading interpolation
+====================
+
+~/${x}
+
+---
+
+(source_code
+    (hpath_expression
+        (path_fragment)
+        (interpolation
+            (variable_expression (identifier)))))
+
+====================
+hpath_expression with leading interpolation and trailing fragment
+====================
+
+~/${x}/config
+
+---
+
+(source_code
+    (hpath_expression
+        (path_fragment)
+        (interpolation
+            (variable_expression (identifier)))
+        (path_fragment)))
+
+====================
 division not mistaken for path_expressions (1)
 ====================
 

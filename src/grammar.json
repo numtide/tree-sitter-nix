@@ -87,37 +87,86 @@
       "value": "\\~\\/[a-zA-Z0-9\\._\\-\\+\\/]+"
     },
     "hpath_expression": {
-      "type": "SEQ",
+      "type": "CHOICE",
       "members": [
         {
-          "type": "ALIAS",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_hpath_start"
-          },
-          "named": true,
-          "value": "path_fragment"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_hpath_start"
+              },
+              "named": true,
+              "value": "path_fragment"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "path_fragment"
+                  },
+                  {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_immediate_interpolation"
+                    },
+                    "named": true,
+                    "value": "interpolation"
+                  }
+                ]
+              }
+            }
+          ]
         },
         {
-          "type": "REPEAT",
-          "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "SYMBOL",
-                "name": "path_fragment"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "STRING",
+                "value": "~/"
               },
-              {
-                "type": "ALIAS",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "_immediate_interpolation"
-                },
-                "named": true,
-                "value": "interpolation"
+              "named": true,
+              "value": "path_fragment"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_immediate_interpolation"
+              },
+              "named": true,
+              "value": "interpolation"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "path_fragment"
+                  },
+                  {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_immediate_interpolation"
+                    },
+                    "named": true,
+                    "value": "interpolation"
+                  }
+                ]
               }
-            ]
-          }
+            }
+          ]
         }
       ]
     },
