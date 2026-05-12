@@ -22,6 +22,8 @@ def __getattr__(name):
         return _get_query("TAGS_QUERY", "tags.scm")
     if name == "INDENTS_QUERY":
         return _get_query("INDENTS_QUERY", "indents.scm")
+    if name == "FOLDS_QUERY":
+        return _get_query("FOLDS_QUERY", "folds.scm")
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
@@ -33,6 +35,7 @@ __all__ = [
     "LOCALS_QUERY",
     "TAGS_QUERY",
     "INDENTS_QUERY",
+    "FOLDS_QUERY",
 ]
 
 
