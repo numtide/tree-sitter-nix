@@ -68,13 +68,16 @@ module.exports = grammar({
         ),
       ),
 
-    // Home path. Matches Nix's lexer.l, which has two productions:
+    // Home path. Inspired by Nix's lexer.l, which has two productions:
     //   HPATH       \~(\/{PATH_CHAR}+)+\/?    e.g. ~/.config
-    //   HPATH_START \~\/                       e.g. ~/${x}
-    // The second exists so a home path can begin with `~/` directly
-    // followed by interpolation. We mirror that here: the start token
-    // is either `~/` followed by at least one path char, OR a bare
-    // `~/` followed immediately by interpolation.
+    //   HPATH_START \~\/                       used for ~/${...}
+    // The second lets a home path begin with `~/` directly followed by
+    // interpolation. We mirror the spirit (not the exact regex shapes —
+    // tree-sitter's lexer is generated, not hand-rolled flex) with two
+    // alternatives: `~/` + path chars, or a bare `~/` literal followed
+    // by mandatory interpolation. Tree-sitter's maximal-munch
+    // tokenisation disambiguates: `~/foo` matches the longer regex,
+    // `~/${...}` matches the bare literal.
     _hpath_start: ($) => /\~\/[a-zA-Z0-9\._\-\+\/]+/,
     hpath_expression: ($) =>
       choice(
