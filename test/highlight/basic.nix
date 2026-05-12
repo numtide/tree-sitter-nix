@@ -1,51 +1,51 @@
 {
   or = { or = 1; }.or or 42;
-  # <- property
-  #  ^ punctuation.delimiter
-  #      ^ property
-  #                 ^ property
-  #                    ^ keyword
+  # <- variable.member
+  #  ^ operator
+  #      ^ variable.member
+  #                 ^ variable.member
+  #                    ^ keyword.operator
   the-question = if builtins.true then "to be" else "not to be";
-  # <- property
-  #  ^ property
-  #    ^ property
-  #               ^ keyword
-  #                  ^ variable.builtin
-  #                           ^ property
-  #                                ^ keyword
+  # <- variable.member
+  #  ^ variable.member
+  #    ^ variable.member
+  #               ^ keyword.conditional
+  #                  ^ constant.builtin
+  #                           ^ variable.member
+  #                                ^ keyword.conditional
   #                                      ^ string
-  #                                             ^ keyword
+  #                                             ^ keyword.conditional
   #                                                    ^ string
   null = if null then true else false;
-  # <- property
-  #          ^ variable.builtin
-  #                    ^ variable.builtin
-  #                              ^ variable.builtin
+  # <- variable.member
+  #          ^ constant.builtin
+  #                    ^ boolean
+  #                              ^ boolean
   pkgs' = { inherit (pkgs) stdenv lib; };
-  # <- property
-  #   ^ property
+  # <- variable.member
+  #   ^ variable.member
   #          ^ keyword
   #                   ^ variable
-  #                         ^ property
-  #                                ^ property
+  #                         ^ variable.member
+  #                                ^ variable.member
   thing' =
-    # <- property
+    # <- variable.member
     let inherit (pkgs) stdenv lib;
     # <- keyword
     #    ^ keyword
     #             ^ variable
-    #                   ^ property
-    #                          ^ property
+    #                   ^ variable.member
+    #                          ^ variable.member
     in derivation rec {
     # <- keyword
       # ^ function.builtin
       #            ^ keyword
       pname = "thing";
-      # <- property
+      # <- variable.member
       #         ^ string
       version = "v1.2.3";
       name = "${pname}-${version}";
-      # <- property
+      # <- variable.member
       #      ^ string
       #       ^ punctuation.special
       #          ^ variable
@@ -54,27 +54,27 @@
       #                   ^ variable
       #                          ^ string
       buildInputs = with pkgs; [ thing_a thing_b ];
-      # <- property
+      # <- variable.member
       #              ^ keyword
       #                   ^ variable
       #                           ^ variable
       #                                    ^ variable
     };
   assert_bool = bool: assert lib.isBool bool; bool;
-  # <- property
+  # <- function
   #               ^ variable.parameter
   #                     ^ keyword
   #                            ^ variable
-  #                                ^ function
+  #                                ^ function.call
   #                                       ^ variable
   #                                             ^ variable
   import = import ./overlays.nix { inherit pkgs; };
-  # <- property
-  #         ^ function.builtin
+  # <- variable.member
+  #         ^ keyword.import
   #                 ^ string.special.path
   #                                 ^ keyword
-  #                                         ^ property
+  #                                         ^ variable.member
   uri = https://github.com;
-  #      ^ string.special.uri
-  #                ^ string.special.uri
+  #      ^ string.special.url
+  #                ^ string.special.url
 }

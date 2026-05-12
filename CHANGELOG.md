@@ -13,6 +13,24 @@ follow [Semantic Versioning](https://semver.org/).
   `Tree`, `Node` modules). No dependency on ocaml-tree-sitter-core.
   [#40]
 
+### Changed (BREAKING for theme consumers)
+
+- `highlights.scm` capture names modernized to align with
+  [nvim-treesitter conventions](https://neovim.io/doc/user/treesitter.html#treesitter-highlight-groups).
+  Themes that string-map the old capture names will need to add
+  fallbacks; modern tree-sitter theme distributions (Tokyo Night,
+  Catppuccin, Gruvbox-Material, etc.) already support the new names.
+  Full rename table in
+  [docs/highlight-groups.md](docs/highlight-groups.md#renames-from-v04x-and-earlier).
+  Notable renames: `@escape` → `@string.escape`,
+  `@string.special.uri` → `@string.special.url`,
+  `@property` → `@variable.member`, `@keyword` split into
+  `@keyword.conditional` / `@keyword.operator` / `@keyword`,
+  booleans → `@boolean`, constants → `@constant.builtin`,
+  apply-position function → `@function.call`. Added `@spell` on
+  comments, `@keyword.import`, `@keyword.exception`,
+  `@variable.parameter.builtin` for `...`. [#48]
+
 ## [0.4.0] — 2026-05-11
 
 ### Added
@@ -139,6 +157,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#41]: https://github.com/numtide/tree-sitter-nix/pull/41
 [#43]: https://github.com/numtide/tree-sitter-nix/pull/43
 [#45]: https://github.com/numtide/tree-sitter-nix/pull/45
+[#48]: https://github.com/numtide/tree-sitter-nix/pull/48
 
 ## [0.3.0] — 2025-08-12 (upstream)
 
