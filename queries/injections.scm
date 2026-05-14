@@ -103,11 +103,12 @@
  (#set! injection.language "python")
  (#set! injection.combined))
 
+
 ;; ----------------------------------------------------------------------
 ;; Filename-based injection for indented strings.
 ;;
 ;; Detect the language from the file extension of a preceding filename
-;; argument in any curried call:
+;; argument in a curried call:
 ;;
 ;;   pkgs.writeText "index.html" ''
 ;;     <div>Hello</div>
@@ -116,131 +117,154 @@
 ;;     echo hi
 ;;   ''
 ;;
-;; The pattern matches any `f "name.ext" '' ... ''` shape. False
-;; positives (a curried call with a filename-shaped argument that isn't
-;; a file writer) are tolerated — the worst case is mis-highlighting,
-;; whereas false negatives mean no highlighting at all.
+;; The pattern matches `f "name.ext" '' ... ''` for any function `f`,
+;; minus a small denylist of common nixpkgs idioms that take a
+;; filename-shaped string but are NOT file writers (`removeSuffix`,
+;; `trace`, `throw`, etc.). Outside the denylist, false positives are
+;; tolerated — the worst case is mis-highlighting, whereas a false
+;; negative means no highlighting at all.
 ;;
 ;; Concept harvested from nix-community/tree-sitter-nix#169 by
 ;; @nuketownada; rewritten as a hand-maintained list rather than
-;; generated from a Nix derivation.
+;; generated from a Nix derivation, with the function denylist added
+;; per adversarial review of #53.
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(sh|bash)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "bash")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(py)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "python")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(html|htm)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "html")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(css)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "css")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(js|mjs|cjs)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "javascript")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(ts|mts|cts)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "typescript")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(json)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "json")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(yml|yaml)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "yaml")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(toml)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "toml")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(lua)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "lua")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(nix)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "nix")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(xml)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "xml")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(md)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "markdown")
  (#set! injection.combined))
 
 ((apply_expression
    function: (apply_expression
+     function: (_) @_inner_func
      argument: (string_expression (string_fragment) @_filename))
    argument: (indented_string_expression (string_fragment) @injection.content))
  (#match? @_filename "\\.(sql)$")
+ (#not-match? @_inner_func "(^|\\.)(removeSuffix|hasSuffix|hasPrefix|removePrefix|trace|throw|warn|warnIf|abort|assertMsg|seq|deepSeq|writeShellScript|writeShellScriptBin|runCommand|runCommandLocal|runCommandCC|runCommandNoCC)$")
  (#set! injection.language "sql")
- (#set! injection.combined))
-
-((apply_expression
-   function: (apply_expression
-     argument: (string_expression (string_fragment) @_filename))
-   argument: (indented_string_expression (string_fragment) @injection.content))
- (#match? @_filename "\\.(conf|ini)$")
- (#set! injection.language "ini")
  (#set! injection.combined))

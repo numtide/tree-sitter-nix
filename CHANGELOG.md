@@ -10,11 +10,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 - Filename-based language injection for indented strings. Curried calls
   like `pkgs.writeText "page.html" '' … ''` now inject the language
-  matching the filename extension. Supports 15+ extensions (`.sh`,
-  `.py`, `.html`, `.css`, `.js`/`.mjs`/`.cjs`, `.ts`/`.mts`/`.cts`,
-  `.json`, `.yml`/`.yaml`, `.toml`, `.lua`, `.nix`, `.xml`, `.md`,
-  `.sql`, `.conf`/`.ini`). Replaces the two `writeText*`-only patterns
-  shipped in v0.4.0. Concept harvested from
+  matching the filename extension. 14 extension classes are supported:
+  `.sh`/`.bash`, `.py`, `.html`/`.htm`, `.css`, `.js`/`.mjs`/`.cjs`,
+  `.ts`/`.mts`/`.cts`, `.json`, `.yml`/`.yaml`, `.toml`, `.lua`,
+  `.nix`, `.xml`, `.md`, `.sql`. A function denylist (`removeSuffix`,
+  `trace`, `throw`, etc.) excludes common nixpkgs idioms that take a
+  filename-shaped string but aren't file writers. Replaces the two
+  `writeText*`-only patterns shipped in v0.4.0. Concept harvested from
   nix-community/tree-sitter-nix#169 by @nuketownada. [#53]
 - `queries/folds.scm` — fold ranges matching nvim-treesitter's vendored
   Nix fold set (attrsets, lists, indented strings, let/with/if
