@@ -103,25 +103,144 @@
  (#set! injection.language "python")
  (#set! injection.combined))
 
-;; pkgs.writeText / writeTextFile / writeTextDir — use the filename
-;; argument's extension to pick a language.
+;; ----------------------------------------------------------------------
+;; Filename-based injection for indented strings.
+;;
+;; Detect the language from the file extension of a preceding filename
+;; argument in any curried call:
+;;
+;;   pkgs.writeText "index.html" ''
+;;     <div>Hello</div>
+;;   ''
+;;   pkgs.writeShellScriptBin "run.sh" ''
+;;     echo hi
+;;   ''
+;;
+;; The pattern matches any `f "name.ext" '' ... ''` shape. False
+;; positives (a curried call with a filename-shaped argument that isn't
+;; a file writer) are tolerated — the worst case is mis-highlighting,
+;; whereas false negatives mean no highlighting at all.
+;;
+;; Concept harvested from nix-community/tree-sitter-nix#169 by
+;; @nuketownada; rewritten as a hand-maintained list rather than
+;; generated from a Nix derivation.
+
 ((apply_expression
    function: (apply_expression
-     function: (variable_expression (identifier) @_func)
      argument: (string_expression (string_fragment) @_filename))
-   argument: (indented_string_expression
-     (string_fragment) @injection.content))
- (#match? @_func "^writeText(File|Dir)?$")
- (#match? @_filename "\\.sh$")
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(sh|bash)$")
  (#set! injection.language "bash")
  (#set! injection.combined))
+
 ((apply_expression
    function: (apply_expression
-     function: (variable_expression (identifier) @_func)
      argument: (string_expression (string_fragment) @_filename))
-   argument: (indented_string_expression
-     (string_fragment) @injection.content))
- (#match? @_func "^writeText(File|Dir)?$")
- (#match? @_filename "\\.py$")
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(py)$")
  (#set! injection.language "python")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(html|htm)$")
+ (#set! injection.language "html")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(css)$")
+ (#set! injection.language "css")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(js|mjs|cjs)$")
+ (#set! injection.language "javascript")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(ts|mts|cts)$")
+ (#set! injection.language "typescript")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(json)$")
+ (#set! injection.language "json")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(yml|yaml)$")
+ (#set! injection.language "yaml")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(toml)$")
+ (#set! injection.language "toml")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(lua)$")
+ (#set! injection.language "lua")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(nix)$")
+ (#set! injection.language "nix")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(xml)$")
+ (#set! injection.language "xml")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(md)$")
+ (#set! injection.language "markdown")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(sql)$")
+ (#set! injection.language "sql")
+ (#set! injection.combined))
+
+((apply_expression
+   function: (apply_expression
+     argument: (string_expression (string_fragment) @_filename))
+   argument: (indented_string_expression (string_fragment) @injection.content))
+ (#match? @_filename "\\.(conf|ini)$")
+ (#set! injection.language "ini")
  (#set! injection.combined))

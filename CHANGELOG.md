@@ -8,6 +8,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Filename-based language injection for indented strings. Curried calls
+  like `pkgs.writeText "page.html" '' … ''` now inject the language
+  matching the filename extension. Supports 15+ extensions (`.sh`,
+  `.py`, `.html`, `.css`, `.js`/`.mjs`/`.cjs`, `.ts`/`.mts`/`.cts`,
+  `.json`, `.yml`/`.yaml`, `.toml`, `.lua`, `.nix`, `.xml`, `.md`,
+  `.sql`, `.conf`/`.ini`). Replaces the two `writeText*`-only patterns
+  shipped in v0.4.0. Concept harvested from
+  nix-community/tree-sitter-nix#169 by @nuketownada. [#53]
 - `queries/folds.scm` — fold ranges matching nvim-treesitter's vendored
   Nix fold set (attrsets, lists, indented strings, let/with/if
   expressions, function bodies), plus `let_attrset_expression`,
@@ -173,6 +181,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#48]: https://github.com/numtide/tree-sitter-nix/pull/48
 [#49]: https://github.com/numtide/tree-sitter-nix/pull/49
 [#50]: https://github.com/numtide/tree-sitter-nix/pull/50
+[#53]: https://github.com/numtide/tree-sitter-nix/pull/53
 
 ## [0.3.0] — 2025-08-12 (upstream)
 
