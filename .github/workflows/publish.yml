@@ -1,17 +1,17 @@
-name: Release to crates.io
+name: Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'  # Matches tags like v1.0.0, v2.1.3, etc.
-  workflow_dispatch:  # Allow manual dry-runs
+      - "v*.*.*" # Matches tags like v1.0.0, v2.1.3, etc.
+  workflow_dispatch: # Allow manual dry-runs
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false  # never cancel a publish mid-flight
+  cancel-in-progress: false # never cancel a publish mid-flight
 
 jobs:
   verify:
@@ -39,7 +39,7 @@ jobs:
       - name: Package contents
         run: cargo package --locked --list
 
-  release:
+  release-crate:
     needs: verify
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -54,3 +54,67 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --locked
+
+  release-wasm:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to upload release assets
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
+        with:
+          # tree-sitter 0.25.10 pins emscripten 4.0.4
+          # (cli/loader/emscripten-version in tree-sitter/tree-sitter@v0.25.10).
+          version: "4.0.4"
+          actions-cache-folder: emsdk-cache
+
+      - name: Install tree-sitter CLI
+        # Pin to the tree-sitter version that generated the checked-in
+        # parser.c (see the @generated header). Building the WASM with
+        # a different tree-sitter version is generally safe, but
+        # pinning avoids surprises.
+        run: npm install --no-save tree-sitter-cli@0.25.10
+
+      - name: Build WASM
+        run: npx tree-sitter build --wasm --output tree-sitter-nix.wasm
+
+      - name: Generate checksum
+        run: sha256sum tree-sitter-nix.wasm > tree-sitter-nix.wasm.sha256
+
+      - name: Verify the WASM blob loads
+        run: |
+          node -e '
+            const fs = require("fs");
+            const buf = fs.readFileSync("tree-sitter-nix.wasm");
+            // Magic bytes: \0asm\x01\x00\x00\x00 (WASM v1)
+            const magic = buf.subarray(0, 8);
+            const expected = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+            if (!magic.equals(expected)) {
+              throw new Error(`Bad WASM magic: ${magic.toString("hex")}`);
+            }
+            console.log(`OK: ${buf.length} bytes, valid WASM v1 magic`);
+          '
+
+      - name: Upload artifacts (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: tree-sitter-nix-wasm
+          path: |
+            tree-sitter-nix.wasm
+            tree-sitter-nix.wasm.sha256
+
+      - name: Upload release assets (tag push)
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: |
+            tree-sitter-nix.wasm
+            tree-sitter-nix.wasm.sha256
