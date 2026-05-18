@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-05-18
+
 ### Added
 
 - Filename-based language injection for indented strings. Curried calls
