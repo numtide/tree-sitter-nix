@@ -924,6 +924,10 @@
             "named": true
           },
           {
+            "type": "has_attr_expression",
+            "named": true
+          },
+          {
             "type": "hpath_expression",
             "named": true
           },

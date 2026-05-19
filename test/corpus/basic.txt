@@ -945,6 +945,72 @@ parenthesized chained comparison is valid
     (integer_expression)))
 
 ====================
+chained has-attr is valid (left-recursive)
+====================
+
+a ? b ? c
+
+---
+
+(source_code
+  (has_attr_expression
+    (has_attr_expression
+      (variable_expression
+        (identifier))
+      (attrpath
+        (identifier)))
+    (attrpath
+      (identifier))))
+
+====================
+unary minus over not
+====================
+
+-!a
+
+---
+
+(source_code
+  (unary_expression
+    (unary_expression
+      (variable_expression
+        (identifier)))))
+
+====================
+unary minus over not extends operand over addition
+====================
+
+-!a + b
+
+---
+
+(source_code
+  (unary_expression
+    (unary_expression
+      (binary_expression
+        (variable_expression
+          (identifier))
+        (variable_expression
+          (identifier))))))
+
+====================
+unary not over minus
+====================
+
+!-a + b
+
+---
+
+(source_code
+  (unary_expression
+    (binary_expression
+      (unary_expression
+        (variable_expression
+          (identifier)))
+      (variable_expression
+        (identifier)))))
+
+====================
 parens
 ====================
 

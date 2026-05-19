@@ -327,55 +327,96 @@ module.exports = grammar({
     _expr_not_u: ($) =>
       seq(field("operator", "!"), field("argument", $._expr_not)),
 
-    // + - (left-assoc, prec 9)
+    // + - (left-assoc, prec 9).
+    //
+    // The `prec(PREC[...], ...)` annotations on this and the following
+    // rules resolve shift/reduce ambiguities introduced by
+    // `_expr_negate_u` admitting a `!`-headed operand. The conflict
+    // chain: after `- ! a` with lookahead `OP`, the parser must shift
+    // (`!`'s operand extends over `+ - * / ++ ?`, so `-!a + b` is
+    // `-(!(a + b))`, matching Nix). The escalating prec values mirror
+    // the precedence ladder so each tighter operator out-shifts the
+    // looser one in the conflict states. These prec annotations are
+    // ONLY exercised in the `- ! ...` conflict states; the rest of the
+    // grammar's precedence is encoded by the tier structure.
     _expr_add: ($) =>
       choice(alias($._expr_add_b, $.binary_expression), $._expr_mul),
     _expr_add_b: ($) =>
-      seq(
-        field("left", $._expr_add),
-        field("operator", choice("+", "-")),
-        field("right", $._expr_mul),
+      prec.left(
+        PREC["+"],
+        seq(
+          field("left", $._expr_add),
+          field("operator", choice("+", "-")),
+          field("right", $._expr_mul),
+        ),
       ),
 
     // * / (left-assoc, prec 10)
     _expr_mul: ($) =>
       choice(alias($._expr_mul_b, $.binary_expression), $._expr_concat),
     _expr_mul_b: ($) =>
-      seq(
-        field("left", $._expr_mul),
-        field("operator", choice("*", "/")),
-        field("right", $._expr_concat),
+      prec.left(
+        PREC["*"],
+        seq(
+          field("left", $._expr_mul),
+          field("operator", choice("*", "/")),
+          field("right", $._expr_concat),
+        ),
       ),
 
     // ++ (right-assoc, prec 11)
     _expr_concat: ($) =>
       choice(alias($._expr_concat_b, $.binary_expression), $._expr_has_attr),
     _expr_concat_b: ($) =>
-      seq(
-        field("left", $._expr_has_attr),
-        field("operator", "++"),
-        field("right", $._expr_concat),
+      prec.right(
+        PREC.concat,
+        seq(
+          field("left", $._expr_has_attr),
+          field("operator", "++"),
+          field("right", $._expr_concat),
+        ),
       ),
 
-    // ? (NONASSOC, prec 12). RHS is an attrpath, not an expression.
-    // Public node type stays `has_attr_expression`.
+    // ? (prec 12). RHS is an attrpath, not an expression. The Nix bison
+    // grammar declares `?` as `%nonassoc`, but because the right operand
+    // is an attrpath (not an `expr_op`), the production
+    // `expr_op '?' attrpath` never produces a shift/reduce conflict at a
+    // following `?` — the parser must reduce. So `a ? b ? c` is valid
+    // Nix and parses as `(a ? b) ? c` (left-recursive). Public node type
+    // stays `has_attr_expression`.
     _expr_has_attr: ($) => choice($.has_attr_expression, $._expr_negate),
     has_attr_expression: ($) =>
-      seq(
-        field("expression", $._expr_negate),
-        field("operator", "?"),
-        field("attrpath", $.attrpath),
+      prec(
+        PREC["?"],
+        seq(
+          field("expression", $._expr_has_attr),
+          field("operator", "?"),
+          field("attrpath", $.attrpath),
+        ),
       ),
 
-    // unary - (NONASSOC, prec 13). Highest-precedence operator.
-    // Operand is apply/select/atom only.
+    // unary - (prec 13). Highest-precedence operator.
+    //
+    // The operand admits another `_expr_negate` (for `- -a`) AND a
+    // `!`-headed expression (for `-!a`). Two prefix operators never
+    // conflict — Nix's `'-' expr_op %prec NEGATE` lets the operand be
+    // the full `expr_op`, with `%prec NEGATE` only resolving conflicts
+    // against following INFIX tokens (so `-a + b` is `(-a) + b`).
+    // The layered grammar encodes the prefix-prefix non-conflict by
+    // explicitly admitting `_expr_not_u` here.
     _expr_negate: ($) =>
       choice(
         alias($._expr_negate_u, $.unary_expression),
         $._expr_apply_expression,
       ),
     _expr_negate_u: ($) =>
-      seq(field("operator", "-"), field("argument", $._expr_negate)),
+      seq(
+        field("operator", "-"),
+        field(
+          "argument",
+          choice($._expr_negate, alias($._expr_not_u, $.unary_expression)),
+        ),
+      ),
 
     // Public node types for unary and binary expressions are produced
     // entirely via `alias()` from the hidden tier rules above. These
