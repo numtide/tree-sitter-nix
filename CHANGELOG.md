@@ -8,6 +8,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- SLSA build provenance attestations for release artifacts. The
+  `release-wasm` and `release-tarball` jobs now generate a
+  cryptographically signed attestation tying each artifact's digest
+  to the workflow run, repo, ref, and commit SHA. Verifiable
+  downstream with `gh attestation verify <file>` plus a `--repo`
+  flag. Recorded in the public Sigstore transparency log. The crate
+  published to crates.io is not attested here — crates.io has its
+  own provenance roadmap and `cargo publish` doesn't emit a local
+  artifact to attest. Documented in the README under "Release
+  artifacts and provenance". [#57]
 - Source tarball attached to GitHub releases. `publish.yml` now has a
   `release-tarball` job that builds `tree-sitter-nix.tar.gz` from
   `git ls-files` plus the generated parser sources. The tar
@@ -209,6 +219,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#53]: https://github.com/numtide/tree-sitter-nix/pull/53
 [#55]: https://github.com/numtide/tree-sitter-nix/pull/55
 [#56]: https://github.com/numtide/tree-sitter-nix/pull/56
+[#57]: https://github.com/numtide/tree-sitter-nix/pull/57
 
 ## [0.3.0] — 2025-08-12 (upstream)
 

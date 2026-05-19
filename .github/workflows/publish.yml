@@ -60,6 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # required to upload release assets
+      id-token: write # required to sign the attestation via GitHub OIDC
+      attestations: write # required to persist the attestation
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -107,6 +109,23 @@ jobs:
             console.log(`OK: ${buf.length} bytes, ${exports.length} exports, valid WASM module`);
           '
 
+      # SLSA build provenance attestation. Cryptographically asserts
+      # that this exact WASM blob (by digest) was built by this
+      # workflow run, from this commit, on this runner. Verifiable
+      # downstream with:
+      #
+      #   gh attestation verify tree-sitter-nix.wasm --repo numtide/tree-sitter-nix
+      #
+      # If the asset is ever swapped after publication, the verify
+      # fails. Recorded in the public Sigstore transparency log.
+      # Only on tag push: attestations are tied to the artifact
+      # digest, and workflow_dispatch artifacts are throwaway.
+      - name: Generate build provenance attestation
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: tree-sitter-nix.wasm
+
       - name: Upload artifacts (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
@@ -141,6 +160,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # required to upload release assets
+      id-token: write # required to sign the attestation via GitHub OIDC
+      attestations: write # required to persist the attestation
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -224,6 +245,16 @@ jobs:
             fi
           done
           echo "OK: $(wc -l <<< "$listing") files, all ${#required[@]} required entries present"
+
+      # SLSA build provenance attestation. See the equivalent step in
+      # `release-wasm` for rationale. Verifiable downstream with:
+      #
+      #   gh attestation verify tree-sitter-nix.tar.gz --repo numtide/tree-sitter-nix
+      - name: Generate build provenance attestation
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: tree-sitter-nix.tar.gz
 
       - name: Upload artifacts (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
