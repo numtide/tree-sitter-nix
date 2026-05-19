@@ -163,6 +163,26 @@ strategy:
   (existing packages under the bare name are controlled by upstream).
   Tracking in [#14](https://github.com/numtide/tree-sitter-nix/issues/14).
 
+### Release artifacts and provenance
+
+Each release attaches `tree-sitter-nix.wasm` (for web tree-sitter
+consumers) and `tree-sitter-nix.tar.gz` (a reproducible source
+tarball with a stable hash, unlike GitHub's auto-generated
+`/archive/...` tarballs), plus SHA256 checksums for both.
+
+Both artifacts carry [SLSA build provenance attestations](https://slsa.dev/provenance)
+signed via [Sigstore](https://www.sigstore.dev/) and recorded in the
+public Rekor transparency log. To verify an artifact was built by
+this repo's CI from the tagged commit:
+
+```bash
+gh attestation verify tree-sitter-nix.wasm --repo numtide/tree-sitter-nix
+gh attestation verify tree-sitter-nix.tar.gz --repo numtide/tree-sitter-nix
+```
+
+If the artifact was tampered with after publication, or built outside
+the official CI, verification fails. Requires `gh` ≥ 2.49.
+
 ## Acknowledgements
 
 Original grammar by [Charles Strahan](https://www.cstrahan.com/) and

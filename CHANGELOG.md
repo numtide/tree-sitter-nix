@@ -12,9 +12,12 @@ follow [Semantic Versioning](https://semver.org/).
   `release-wasm` and `release-tarball` jobs now generate a
   cryptographically signed attestation tying each artifact's digest
   to the workflow run, repo, ref, and commit SHA. Verifiable
-  downstream with `gh attestation verify <file> --owner numtide`.
-  Recorded in the public Sigstore transparency log. Mirrors
-  tree-sitter's official `release.yml`. [#57]
+  downstream with `gh attestation verify <file>` plus a `--repo`
+  flag. Recorded in the public Sigstore transparency log. The crate
+  published to crates.io is not attested here — crates.io has its
+  own provenance roadmap and `cargo publish` doesn't emit a local
+  artifact to attest. Documented in the README under "Release
+  artifacts and provenance". [#57]
 - Source tarball attached to GitHub releases. `publish.yml` now has a
   `release-tarball` job that builds `tree-sitter-nix.tar.gz` from
   `git ls-files` plus the generated parser sources. The tar
