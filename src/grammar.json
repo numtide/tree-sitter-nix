@@ -2301,7 +2301,13 @@
       "name": "_indented_dollar_escape"
     }
   ],
-  "inline": [],
+  "inline": [
+    "_expr_op",
+    "_expr_pipe",
+    "_expr_impl",
+    "_expr_or",
+    "_expr_and"
+  ],
   "supertypes": [
     "_expression",
     "comment"

@@ -28,7 +28,24 @@ module.exports = grammar({
 
   supertypes: ($) => [$._expression, $.comment],
 
-  inline: ($) => [],
+  // Inline the top-tier precedence connector rules. The layered
+  // operator grammar (#52) introduces ~13 hidden tier rules; every
+  // non-operator expression reduces through the whole chain, roughly
+  // doubling the reduce count and costing ~20-37% parse speed vs a
+  // flat grammar. Inlining the top 5 low-branching tiers collapses
+  // those unit reductions back into their call sites, recovering ~1/3
+  // of the regression. Inlining more tiers explodes the state count
+  // (each inlined 2-alternative rule multiplies through the operand
+  // references), so this is the sweet spot — verified by a parameter
+  // sweep: top-5 keeps STATE_COUNT ~922 and all tests/oracle passing,
+  // while top-9 crosses 2000 states and inline-all hits 5600.
+  inline: ($) => [
+    $._expr_op,
+    $._expr_pipe,
+    $._expr_impl,
+    $._expr_or,
+    $._expr_and,
+  ],
 
   externals: ($) => [
     $.string_fragment,
