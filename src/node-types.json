@@ -920,6 +920,10 @@
             "named": true
           },
           {
+            "type": "binary_expression",
+            "named": true
+          },
+          {
             "type": "float_expression",
             "named": true
           },

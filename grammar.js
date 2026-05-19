@@ -28,24 +28,15 @@ module.exports = grammar({
 
   supertypes: ($) => [$._expression, $.comment],
 
-  // Inline the top-tier precedence connector rules. The layered
-  // operator grammar (#52) introduces ~13 hidden tier rules; every
-  // non-operator expression reduces through the whole chain, roughly
-  // doubling the reduce count and costing ~20-37% parse speed vs a
-  // flat grammar. Inlining the top 5 low-branching tiers collapses
-  // those unit reductions back into their call sites, recovering ~1/3
-  // of the regression. Inlining more tiers explodes the state count
-  // (each inlined 2-alternative rule multiplies through the operand
-  // references), so this is the sweet spot — verified by a parameter
-  // sweep: top-5 keeps STATE_COUNT ~922 and all tests/oracle passing,
-  // while top-9 crosses 2000 states and inline-all hits 5600.
-  inline: ($) => [
-    $._expr_op,
-    $._expr_pipe,
-    $._expr_impl,
-    $._expr_or,
-    $._expr_and,
-  ],
+  // Inline the passthrough precedence connectors. The hybrid operator
+  // grammar (#52) keeps only the two NONASSOC tiers as separate
+  // structural rules; the rest are flat. The remaining connector rules
+  // (`_expr_op`, `_expr_pipe`) are single/low-branching passthroughs
+  // whose unit reductions are pure overhead — inlining replaces their
+  // usages with copies and removes those reductions. The flat tiers
+  // (`_expr_low`, `_expr_high`) are NOT inlined: they have multiple
+  // alternatives and inlining them multiplies the state count.
+  inline: ($) => [$._expr_op, $._expr_pipe],
 
   externals: ($) => [
     $.string_fragment,
@@ -251,62 +242,95 @@ module.exports = grammar({
     // be `_expr_eq`, but `_expr_eq` is excluded.
     // ====================================================================
 
+    // Only the two NONASSOC tiers (== != and < > <= >=) need to be
+    // separate structural rules: they constrain their operands to a
+    // tighter tier so a chain like `a == b == c` cannot be derived.
+    // Everything else is left/right-associative and lives in a flat
+    // rule with `prec.left`/`prec.right` — the fast, idiomatic
+    // tree-sitter encoding (this is how the grammar worked before #52).
+    //
+    // The crucial safety distinction vs. PR #51: the `prec` here is
+    // INTRA-rule (operators within one flat `choice`), which tree-sitter
+    // resolves correctly. PR #51's precedence inversion came from `prec`
+    // ACROSS separate rules, which `prec` does not arbitrate.
+    //
+    // Tiers, lowest to highest precedence:
+    //
+    //   _expr_pipe : |> <|              (kept separate — |> and <| are
+    //                                    mutually exclusive, which a flat
+    //                                    rule cannot express)
+    //   _expr_low  : -> || &&           (flat, prec 2-4)
+    //   _expr_eq   : == !=              (NONASSOC, prec 5)
+    //   _expr_cmp  : < > <= >=          (NONASSOC, prec 6)
+    //   _expr_high : // ! + - * / ++ ?  unary - (flat, prec 7-13)
+    //
+    // A plain (operator-free) expression reduces through ~6 tiers
+    // instead of ~13, roughly halving the unit-reduction cost that the
+    // fully-layered grammar paid on every value.
+
     _expr_op: ($) => $._expr_pipe,
 
-    // |> (left-assoc, prec 1) and <| (right-assoc, prec 1) — Nix 2.24+
-    // pipe operators, lowest precedence.
+    // |> (left-assoc) <| (right-assoc) — Nix 2.24+ pipes, lowest prec.
+    // Separate l/r productions keep them mutually exclusive: the operand
+    // of each is `_expr_low`, which excludes the other pipe, so
+    // `1 |> f <| g` is rejected (matching Nix).
     _expr_pipe: ($) =>
       choice(
         alias($._expr_pipe_l, $.binary_expression),
         alias($._expr_pipe_r, $.binary_expression),
-        $._expr_impl,
+        $._expr_low,
       ),
     _expr_pipe_l: ($) =>
       seq(
         field("left", $._expr_pipe),
         field("operator", "|>"),
-        field("right", $._expr_impl),
+        field("right", $._expr_low),
       ),
     _expr_pipe_r: ($) =>
       prec.right(
         seq(
-          field("left", $._expr_impl),
+          field("left", $._expr_low),
           field("operator", "<|"),
           field("right", $._expr_pipe),
         ),
       ),
 
-    // -> (right-assoc, prec 2)
-    _expr_impl: ($) =>
-      choice(alias($._expr_impl_b, $.binary_expression), $._expr_or),
-    _expr_impl_b: ($) =>
-      seq(
-        field("left", $._expr_or),
-        field("operator", "->"),
-        field("right", $._expr_impl),
+    // -> (right, prec 2) || (left, prec 3) && (left, prec 4).
+    // Flat rule; operands are `_expr_low` so they chain among themselves
+    // and fall through to the nonassoc tiers. Intra-rule prec sorts the
+    // three operators.
+    _expr_low: ($) =>
+      choice(alias($._expr_low_b, $.binary_expression), $._expr_eq),
+    _expr_low_b: ($) =>
+      choice(
+        prec.right(
+          PREC.impl,
+          seq(
+            field("left", $._expr_low),
+            field("operator", "->"),
+            field("right", $._expr_low),
+          ),
+        ),
+        prec.left(
+          PREC.or,
+          seq(
+            field("left", $._expr_low),
+            field("operator", "||"),
+            field("right", $._expr_low),
+          ),
+        ),
+        prec.left(
+          PREC.and,
+          seq(
+            field("left", $._expr_low),
+            field("operator", "&&"),
+            field("right", $._expr_low),
+          ),
+        ),
       ),
 
-    // || (left-assoc, prec 3)
-    _expr_or: ($) =>
-      choice(alias($._expr_or_b, $.binary_expression), $._expr_and),
-    _expr_or_b: ($) =>
-      seq(
-        field("left", $._expr_or),
-        field("operator", "||"),
-        field("right", $._expr_and),
-      ),
-
-    // && (left-assoc, prec 4)
-    _expr_and: ($) =>
-      choice(alias($._expr_and_b, $.binary_expression), $._expr_eq),
-    _expr_and_b: ($) =>
-      seq(
-        field("left", $._expr_and),
-        field("operator", "&&"),
-        field("right", $._expr_eq),
-      ),
-
-    // == != (NONASSOC, prec 5). Both operands from the next-tighter tier.
+    // == != (NONASSOC, prec 5). Operands are `_expr_cmp` (one tier
+    // tighter), so `a == b == c` cannot be derived.
     _expr_eq: ($) =>
       choice(alias($._expr_eq_b, $.binary_expression), $._expr_cmp),
     _expr_eq_b: ($) =>
@@ -316,151 +340,90 @@ module.exports = grammar({
         field("right", $._expr_cmp),
       ),
 
-    // < > <= >= (NONASSOC, prec 6). Both operands from the next-tighter tier.
+    // < > <= >= (NONASSOC, prec 6). Operands are `_expr_high`.
     _expr_cmp: ($) =>
-      choice(alias($._expr_cmp_b, $.binary_expression), $._expr_update),
+      choice(alias($._expr_cmp_b, $.binary_expression), $._expr_high),
     _expr_cmp_b: ($) =>
       seq(
-        field("left", $._expr_update),
+        field("left", $._expr_high),
         field("operator", choice("<", ">", "<=", ">=")),
-        field("right", $._expr_update),
+        field("right", $._expr_high),
       ),
 
-    // // (right-assoc, prec 7)
-    _expr_update: ($) =>
-      choice(alias($._expr_update_b, $.binary_expression), $._expr_not),
-    _expr_update_b: ($) =>
-      seq(
-        field("left", $._expr_not),
-        field("operator", "//"),
-        field("right", $._expr_update),
+    // The high-precedence band: // (right, 7), ! (unary, 8),
+    // + - (left, 9), * / (left, 10), ++ (right, 11), ? (12),
+    // unary - (13). All flat with operands `_expr_high`; intra-rule
+    // prec sorts them. This mirrors the pre-#52 flat grammar, restricted
+    // to the operators above the nonassoc band — so it inherits that
+    // grammar's correct, conflict-free precedence handling, including
+    // the unusual `!` < `+` ordering (`!a + b` is `!(a + b)`,
+    // `a + !b` is `a + (!b)`) and the prefix-prefix non-conflict
+    // (`-!a`, `!-a`).
+    _expr_high: ($) =>
+      choice(
+        alias($._expr_high_b, $.binary_expression),
+        alias($._expr_high_u, $.unary_expression),
+        $.has_attr_expression,
+        $._expr_apply_expression,
       ),
-
-    // ! (unary prefix, prec 8). Operand is the next-tighter tier (so
-    // `!a + b` parses as `!(a + b)`, matching Nix). Recurses on itself
-    // for `!!a`.
-    _expr_not: ($) =>
-      choice(alias($._expr_not_u, $.unary_expression), $._expr_add),
-    _expr_not_u: ($) =>
-      seq(field("operator", "!"), field("argument", $._expr_not)),
-
-    // + - (left-assoc, prec 9).
-    //
-    // The `prec(PREC[...], ...)` annotations on this and the following
-    // rules resolve shift/reduce ambiguities introduced by
-    // `_expr_negate_u` admitting a `!`-headed operand. The conflict
-    // chain: after `- ! a` with lookahead `OP`, the parser must shift
-    // (`!`'s operand extends over `+ - * / ++ ?`, so `-!a + b` is
-    // `-(!(a + b))`, matching Nix). The escalating prec values mirror
-    // the precedence ladder so each tighter operator out-shifts the
-    // looser one in the conflict states. These prec annotations are
-    // ONLY exercised in the `- ! ...` conflict states; the rest of the
-    // grammar's precedence is encoded by the tier structure.
-    // The RHS of `+ - * / ++` admits a `!`-headed expression in
-    // addition to the next-tighter tier. Nix has `!` (prec 8) BELOW
-    // `+` (prec 9), which is unusual — most languages put `!` at the
-    // top. So `a + !b` is valid Nix (`a + (!b)`), but in a strict
-    // tier hierarchy, `+`'s RHS would be `_expr_mul` (tier 10) which
-    // can't reach `!` (tier 8). The `_expr_prefix_rhs` escape hatch
-    // lets `!` start the RHS; `!`'s own operand reach is determined
-    // by the `_expr_not` rule. Conflicts are resolved by the
-    // escalating `prec.left`/`prec.right` annotations.
-    _expr_prefix_rhs: ($) => alias($._expr_not_u, $.unary_expression),
-
-    _expr_add: ($) =>
-      choice(alias($._expr_add_b, $.binary_expression), $._expr_mul),
-    _expr_add_b: ($) =>
-      prec.left(
-        PREC["+"],
-        seq(
-          field("left", $._expr_add),
-          field("operator", choice("+", "-")),
-          field("right", choice($._expr_mul, $._expr_prefix_rhs)),
+    _expr_high_b: ($) =>
+      choice(
+        prec.right(
+          PREC.update,
+          seq(
+            field("left", $._expr_high),
+            field("operator", "//"),
+            field("right", $._expr_high),
+          ),
+        ),
+        prec.left(
+          PREC["+"],
+          seq(
+            field("left", $._expr_high),
+            field("operator", choice("+", "-")),
+            field("right", $._expr_high),
+          ),
+        ),
+        prec.left(
+          PREC["*"],
+          seq(
+            field("left", $._expr_high),
+            field("operator", choice("*", "/")),
+            field("right", $._expr_high),
+          ),
+        ),
+        prec.right(
+          PREC.concat,
+          seq(
+            field("left", $._expr_high),
+            field("operator", "++"),
+            field("right", $._expr_high),
+          ),
+        ),
+      ),
+    _expr_high_u: ($) =>
+      choice(
+        prec(
+          PREC.not,
+          seq(field("operator", "!"), field("argument", $._expr_high)),
+        ),
+        prec(
+          PREC.negate,
+          seq(field("operator", "-"), field("argument", $._expr_high)),
         ),
       ),
 
-    // * / (left-assoc, prec 10)
-    _expr_mul: ($) =>
-      choice(alias($._expr_mul_b, $.binary_expression), $._expr_concat),
-    _expr_mul_b: ($) =>
-      prec.left(
-        PREC["*"],
-        seq(
-          field("left", $._expr_mul),
-          field("operator", choice("*", "/")),
-          field("right", choice($._expr_concat, $._expr_prefix_rhs)),
-        ),
-      ),
-
-    // ++ (right-assoc, prec 11)
-    _expr_concat: ($) =>
-      choice(alias($._expr_concat_b, $.binary_expression), $._expr_has_attr),
-    _expr_concat_b: ($) =>
-      prec.right(
-        PREC.concat,
-        seq(
-          field("left", $._expr_has_attr),
-          field("operator", "++"),
-          field("right", choice($._expr_concat, $._expr_prefix_rhs)),
-        ),
-      ),
-
-    // ? (prec 12). RHS is an attrpath, not an expression. The Nix bison
-    // grammar declares `?` as `%nonassoc`, but because the right operand
-    // is an attrpath (not an `expr_op`), the production
-    // `expr_op '?' attrpath` never produces a shift/reduce conflict at a
-    // following `?` — the parser must reduce. So `a ? b ? c` is valid
-    // Nix and parses as `(a ? b) ? c` (left-recursive). Public node type
-    // stays `has_attr_expression`.
-    _expr_has_attr: ($) => choice($.has_attr_expression, $._expr_negate),
+    // ? (prec 12). RHS is an attrpath, not an expression. Left-recursive
+    // (`a ? b ? c` is `(a ? b) ? c`) because the attrpath RHS means a
+    // following `?` never conflicts.
     has_attr_expression: ($) =>
       prec(
         PREC["?"],
         seq(
-          field("expression", $._expr_has_attr),
+          field("expression", $._expr_high),
           field("operator", "?"),
           field("attrpath", $.attrpath),
         ),
-      ),
-
-    // unary - (prec 13). Highest-precedence operator.
-    //
-    // The operand admits another `_expr_negate` (for `- -a`) AND a
-    // `!`-headed expression (for `-!a`). Two prefix operators never
-    // conflict — Nix's `'-' expr_op %prec NEGATE` lets the operand be
-    // the full `expr_op`, with `%prec NEGATE` only resolving conflicts
-    // against following INFIX tokens (so `-a + b` is `(-a) + b`).
-    // The layered grammar encodes the prefix-prefix non-conflict by
-    // explicitly admitting `_expr_not_u` here.
-    _expr_negate: ($) =>
-      choice(
-        alias($._expr_negate_u, $.unary_expression),
-        $._expr_apply_expression,
-      ),
-    _expr_negate_u: ($) =>
-      seq(
-        field("operator", "-"),
-        field(
-          "argument",
-          choice($._expr_negate, alias($._expr_not_u, $.unary_expression)),
-        ),
-      ),
-
-    // Public node types for unary and binary expressions are produced
-    // entirely via `alias()` from the hidden tier rules above. These
-    // explicit definitions keep `node-types.json` populated. They are
-    // unreachable from `_expr_op` (the alias-target machinery handles
-    // production), but tree-sitter requires named rules to be defined.
-    unary_expression: ($) =>
-      choice(
-        seq(field("operator", "!"), field("argument", $._expr_not)),
-        seq(field("operator", "-"), field("argument", $._expr_negate)),
-      ),
-    binary_expression: ($) =>
-      seq(
-        field("left", $._expr_op),
-        field("operator", "+"),
-        field("right", $._expr_op),
       ),
 
     _expr_apply_expression: ($) =>
