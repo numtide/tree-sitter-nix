@@ -156,15 +156,34 @@ jobs:
       # `fetchurl` hashes in nixpkgs / Bazel / Buck consumers. This
       # tarball is built once and stays fixed.
       #
-      # Mirrors tree-sitter's official `release.yml` reusable workflow.
+      # Reproducibility caveats:
+      # - `LC_ALL=C` so `sort` collation order is locale-independent.
+      #   Without it, en_US.UTF-8 vs C.UTF-8 produce different file
+      #   orders → different SHA256.
+      # - `--mode=ugo+rX,u+w` normalizes file modes so the runner's
+      #   umask doesn't leak into the archive.
+      # - `--mtime` pins entry mtimes to the commit timestamp.
+      # - tar's `--sort=name` is dropped: it only affects recursive
+      #   directory traversal, not `-T` file lists, so it was a no-op.
+      # - tar/gzip versions are NOT pinned (ubuntu-latest stock).
+      #   DEFLATE encoding is implementation-defined, so the hash is
+      #   only stable across runs on the same image. The strong
+      #   guarantee for downstream consumers is "uploaded once, stays
+      #   fixed" — the asset itself never changes.
+      #
+      # File selection mirrors tree-sitter's official `release.yml`
+      # reusable workflow.
       - name: Create source tarball
+        env:
+          LC_ALL: C
         run: |
           git ls-files > "$RUNNER_TEMP/files"
           printf '%s\n' >> "$RUNNER_TEMP/files" \
             src/parser.c src/scanner.c src/grammar.json src/node-types.json \
             src/tree_sitter/parser.h src/tree_sitter/alloc.h src/tree_sitter/array.h
           tar czf tree-sitter-nix.tar.gz \
-            --owner=0 --group=0 --numeric-owner --sort=name \
+            --owner=0 --group=0 --numeric-owner \
+            --mode='ugo+rX,u+w' \
             --mtime="@$(git log -1 --format=%ct)" \
             -T <(sort -u "$RUNNER_TEMP/files")
 
@@ -173,18 +192,38 @@ jobs:
 
       - name: Validate tarball contents
         # Sanity-check the tarball has the must-have files for downstream
-        # consumers: the generated parser, the grammar definition, and the
-        # query files. A misconfigured `git ls-files` (e.g. shallow clone
-        # without LFS) would be caught here.
+        # consumers. A misconfigured `git ls-files` (e.g. shallow clone
+        # without LFS) would be caught here. `grep -qFx` so dots aren't
+        # treated as regex wildcards.
         run: |
           listing=$(tar tzf tree-sitter-nix.tar.gz)
-          for f in src/parser.c grammar.js queries/highlights.scm tree-sitter.json LICENSE; do
-            if ! grep -qx "$f" <<< "$listing"; then
+          required=(
+            grammar.js
+            tree-sitter.json
+            LICENSE
+            src/parser.c
+            src/scanner.c
+            src/grammar.json
+            src/node-types.json
+            src/tree_sitter/parser.h
+            src/tree_sitter/alloc.h
+            src/tree_sitter/array.h
+            queries/highlights.scm
+            queries/injections.scm
+            queries/locals.scm
+            queries/tags.scm
+            queries/indents.scm
+            queries/folds.scm
+            bindings/rust/lib.rs
+            bindings/node/index.js
+          )
+          for f in "${required[@]}"; do
+            if ! grep -qFx "$f" <<< "$listing"; then
               echo "::error::Required file missing from tarball: $f"
               exit 1
             fi
           done
-          echo "OK: $(wc -l <<< "$listing") files, all required entries present"
+          echo "OK: $(wc -l <<< "$listing") files, all ${#required[@]} required entries present"
 
       - name: Upload artifacts (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
