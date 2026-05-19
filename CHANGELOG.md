@@ -6,6 +6,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- WASM build attached to GitHub releases. `publish.yml` now has a
+  `release-wasm` job that builds `tree-sitter-nix.wasm` (with
+  emscripten 4.0.4, matching tree-sitter 0.25.10's pin), validates
+  the module structure with `WebAssembly.Module()` (full validation,
+  not just the magic header) and checks for a `tree_sitter_*` export,
+  generates a SHA256 checksum, and uploads both to the existing
+  GitHub release on tag push via `gh release upload`. Closes [#14].
+  [#55]
+
 ## [0.5.0] — 2026-05-18
 
 ### Added
@@ -163,6 +174,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#3]: https://github.com/numtide/tree-sitter-nix/pull/3
 [#4]: https://github.com/numtide/tree-sitter-nix/pull/4
 [#12]: https://github.com/numtide/tree-sitter-nix/issues/12
+[#14]: https://github.com/numtide/tree-sitter-nix/issues/14
 [#25]: https://github.com/numtide/tree-sitter-nix/pull/25
 [#26]: https://github.com/numtide/tree-sitter-nix/pull/26
 [#27]: https://github.com/numtide/tree-sitter-nix/pull/27
@@ -186,6 +198,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#49]: https://github.com/numtide/tree-sitter-nix/pull/49
 [#50]: https://github.com/numtide/tree-sitter-nix/pull/50
 [#53]: https://github.com/numtide/tree-sitter-nix/pull/53
+[#55]: https://github.com/numtide/tree-sitter-nix/pull/55
 
 ## [0.3.0] — 2025-08-12 (upstream)
 
