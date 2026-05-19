@@ -44,10 +44,12 @@ follow [Semantic Versioning](https://semver.org/).
   exactly as in Nix. Cross-tier mixing like `1 == 2 < 3` and
   parenthesized chains like `(1 == 2) == 3` continue to parse.
   Implemented via a layered expression hierarchy (one hidden rule per
-  precedence tier), validated against `nix-instantiate` on a 309-case
-  cross-check matrix that compares both accept/reject AND parse-tree
-  grouping. The public `binary_expression`, `unary_expression`, and
-  `has_attr_expression` node types are unchanged. Closes [#52]. [#58]
+  precedence tier), validated against `nix-instantiate` on a 341-case
+  cross-check matrix (committed at `test/oracle/`) that compares both
+  accept/reject AND parse-tree grouping. The public `binary_expression`,
+  `unary_expression`, and `has_attr_expression` node types are
+  unchanged. The top-5 connector tiers are inlined to recover ~1/3 of
+  the parse-speed cost of the deeper hierarchy. Closes [#52]. [#58]
 
 ## [0.5.0] — 2026-05-18
 
