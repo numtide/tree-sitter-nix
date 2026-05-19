@@ -11,8 +11,11 @@ follow [Semantic Versioning](https://semver.org/).
 - WASM build attached to GitHub releases. `publish.yml` now has a
   `release-wasm` job that builds `tree-sitter-nix.wasm` (with
   emscripten 4.0.4, matching tree-sitter 0.25.10's pin), validates
-  the WASM v1 magic bytes, generates a SHA256 checksum, and uploads
-  both as release assets on tag push. Closes #14. [#55]
+  the module structure with `WebAssembly.Module()` (full validation,
+  not just the magic header) and checks for a `tree_sitter_*` export,
+  generates a SHA256 checksum, and uploads both to the existing
+  GitHub release on tag push via `gh release upload`. Closes [#14].
+  [#55]
 
 ## [0.5.0] — 2026-05-18
 
@@ -171,6 +174,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#3]: https://github.com/numtide/tree-sitter-nix/pull/3
 [#4]: https://github.com/numtide/tree-sitter-nix/pull/4
 [#12]: https://github.com/numtide/tree-sitter-nix/issues/12
+[#14]: https://github.com/numtide/tree-sitter-nix/issues/14
 [#25]: https://github.com/numtide/tree-sitter-nix/pull/25
 [#26]: https://github.com/numtide/tree-sitter-nix/pull/26
 [#27]: https://github.com/numtide/tree-sitter-nix/pull/27

@@ -88,18 +88,23 @@ jobs:
       - name: Generate checksum
         run: sha256sum tree-sitter-nix.wasm > tree-sitter-nix.wasm.sha256
 
-      - name: Verify the WASM blob loads
+      - name: Validate WASM module structure
+        # WebAssembly.Module() runs the full WASM validation algorithm
+        # (section ordering, type checking, function-table consistency),
+        # not just the magic header. A truncated or corrupt blob with an
+        # intact header would still fail here. It does NOT instantiate
+        # or call into the parser — that needs web-tree-sitter, which
+        # we don't add as a dev dependency just for this check.
         run: |
           node -e '
             const fs = require("fs");
             const buf = fs.readFileSync("tree-sitter-nix.wasm");
-            // Magic bytes: \0asm\x01\x00\x00\x00 (WASM v1)
-            const magic = buf.subarray(0, 8);
-            const expected = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
-            if (!magic.equals(expected)) {
-              throw new Error(`Bad WASM magic: ${magic.toString("hex")}`);
+            const mod = new WebAssembly.Module(buf);
+            const exports = WebAssembly.Module.exports(mod).map((e) => e.name);
+            if (!exports.some((n) => n.startsWith("tree_sitter_"))) {
+              throw new Error(`Missing tree_sitter_* export. Got: ${exports.join(", ")}`);
             }
-            console.log(`OK: ${buf.length} bytes, valid WASM v1 magic`);
+            console.log(`OK: ${buf.length} bytes, ${exports.length} exports, valid WASM module`);
           '
 
       - name: Upload artifacts (workflow_dispatch)
@@ -111,10 +116,22 @@ jobs:
             tree-sitter-nix.wasm
             tree-sitter-nix.wasm.sha256
 
+      # Use `gh release upload` rather than softprops/action-gh-release.
+      # The latter auto-creates a published release with no body if one
+      # doesn't already exist, which would race with the manual release
+      # creation we do after pushing a tag. `gh release upload` fails
+      # cleanly with a clear error if the release isn't there yet.
+      #
+      # `--clobber` overwrites existing assets — needed for the
+      # legitimate "delete the broken release, fix, re-tag, re-publish"
+      # workflow. Be aware this also means a force-pushed tag silently
+      # replaces the WASM asset. Force-pushing a published tag is bad
+      # practice independent of this workflow.
       - name: Upload release assets (tag push)
         if: github.event_name == 'push'
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
-        with:
-          files: |
-            tree-sitter-nix.wasm
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            tree-sitter-nix.wasm \
             tree-sitter-nix.wasm.sha256
