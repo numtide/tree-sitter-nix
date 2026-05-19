@@ -920,15 +920,7 @@
             "named": true
           },
           {
-            "type": "binary_expression",
-            "named": true
-          },
-          {
             "type": "float_expression",
-            "named": true
-          },
-          {
-            "type": "has_attr_expression",
             "named": true
           },
           {

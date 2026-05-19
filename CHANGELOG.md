@@ -36,6 +36,19 @@ follow [Semantic Versioning](https://semver.org/).
   GitHub release on tag push via `gh release upload`. Closes [#14].
   [#55]
 
+### Fixed
+
+- Equality (`==`, `!=`) and comparison (`<`, `<=`, `>`, `>=`) are now
+  non-associative, matching Nix's `%nonassoc` declarations. Chained
+  expressions like `1 == 2 == 3` and `1 < 2 < 3` are now parse errors,
+  exactly as in Nix. Cross-tier mixing like `1 == 2 < 3` and
+  parenthesized chains like `(1 == 2) == 3` continue to parse.
+  Implemented via a layered expression hierarchy (one hidden rule per
+  precedence tier), validated against `nix-instantiate` on a 309-case
+  cross-check matrix that compares both accept/reject AND parse-tree
+  grouping. The public `binary_expression`, `unary_expression`, and
+  `has_attr_expression` node types are unchanged. Closes [#52]. [#58]
+
 ## [0.5.0] — 2026-05-18
 
 ### Added
@@ -216,10 +229,12 @@ follow [Semantic Versioning](https://semver.org/).
 [#48]: https://github.com/numtide/tree-sitter-nix/pull/48
 [#49]: https://github.com/numtide/tree-sitter-nix/pull/49
 [#50]: https://github.com/numtide/tree-sitter-nix/pull/50
+[#52]: https://github.com/numtide/tree-sitter-nix/issues/52
 [#53]: https://github.com/numtide/tree-sitter-nix/pull/53
 [#55]: https://github.com/numtide/tree-sitter-nix/pull/55
 [#56]: https://github.com/numtide/tree-sitter-nix/pull/56
 [#57]: https://github.com/numtide/tree-sitter-nix/pull/57
+[#58]: https://github.com/numtide/tree-sitter-nix/pull/58
 
 ## [0.3.0] — 2025-08-12 (upstream)
 

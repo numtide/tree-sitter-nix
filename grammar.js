@@ -197,86 +197,201 @@ module.exports = grammar({
         field("alternative", $._expression),
       ),
 
-    _expr_op: ($) =>
+    // ====================================================================
+    // Operator-expression hierarchy (issue #52)
+    //
+    // Each precedence tier has its own hidden rule. Precedence and
+    // associativity are encoded structurally — by which tier each rule's
+    // operands draw from — not by `prec()` annotations, which only resolve
+    // shift/reduce conflicts within a single rule (not across rules).
+    //
+    // This is the textbook layered LR grammar. It mirrors Nix's bison
+    // declarations, including the `%nonassoc` levels:
+    //
+    //   %right IMPL                       -> _expr_impl
+    //   %left OR                          -> _expr_or
+    //   %left AND                         -> _expr_and
+    //   %nonassoc EQ NEQ                  -> _expr_eq      (NONASSOC)
+    //   %nonassoc '<' '>' LEQ GEQ         -> _expr_cmp     (NONASSOC)
+    //   %right UPDATE                     -> _expr_update
+    //   %left NOT                         -> _expr_not     (unary)
+    //   %left '+' '-'                     -> _expr_add
+    //   %left '*' '/'                     -> _expr_mul
+    //   %right CONCAT                     -> _expr_concat
+    //   %nonassoc '?'                     -> has_attr      (attrpath RHS)
+    //   %nonassoc NEGATE                  -> _expr_negate  (unary)
+    //
+    // The pipe operators (`|>` left-assoc, `<|` right-assoc) sit BELOW
+    // implication.
+    //
+    // Every rule that produces a binary operator is `alias()`'d to
+    // `binary_expression` so the public AST node type is unchanged —
+    // existing queries and consumers keep working.
+    //
+    // Non-assoc tiers (`_expr_eq`, `_expr_cmp`, `has_attr`) constrain BOTH
+    // operands to the next-tighter tier, so a chain like `a == b == c`
+    // cannot be derived: the left operand of the outer `==` would need to
+    // be `_expr_eq`, but `_expr_eq` is excluded.
+    // ====================================================================
+
+    _expr_op: ($) => $._expr_pipe,
+
+    // |> (left-assoc, prec 1) and <| (right-assoc, prec 1) — Nix 2.24+
+    // pipe operators, lowest precedence.
+    _expr_pipe: ($) =>
       choice(
-        $.has_attr_expression,
-        $.unary_expression,
-        $.binary_expression,
+        alias($._expr_pipe_l, $.binary_expression),
+        alias($._expr_pipe_r, $.binary_expression),
+        $._expr_impl,
+      ),
+    _expr_pipe_l: ($) =>
+      seq(
+        field("left", $._expr_pipe),
+        field("operator", "|>"),
+        field("right", $._expr_impl),
+      ),
+    _expr_pipe_r: ($) =>
+      prec.right(
+        seq(
+          field("left", $._expr_impl),
+          field("operator", "<|"),
+          field("right", $._expr_pipe),
+        ),
+      ),
+
+    // -> (right-assoc, prec 2)
+    _expr_impl: ($) =>
+      choice(alias($._expr_impl_b, $.binary_expression), $._expr_or),
+    _expr_impl_b: ($) =>
+      seq(
+        field("left", $._expr_or),
+        field("operator", "->"),
+        field("right", $._expr_impl),
+      ),
+
+    // || (left-assoc, prec 3)
+    _expr_or: ($) =>
+      choice(alias($._expr_or_b, $.binary_expression), $._expr_and),
+    _expr_or_b: ($) =>
+      seq(
+        field("left", $._expr_or),
+        field("operator", "||"),
+        field("right", $._expr_and),
+      ),
+
+    // && (left-assoc, prec 4)
+    _expr_and: ($) =>
+      choice(alias($._expr_and_b, $.binary_expression), $._expr_eq),
+    _expr_and_b: ($) =>
+      seq(
+        field("left", $._expr_and),
+        field("operator", "&&"),
+        field("right", $._expr_eq),
+      ),
+
+    // == != (NONASSOC, prec 5). Both operands from the next-tighter tier.
+    _expr_eq: ($) =>
+      choice(alias($._expr_eq_b, $.binary_expression), $._expr_cmp),
+    _expr_eq_b: ($) =>
+      seq(
+        field("left", $._expr_cmp),
+        field("operator", choice("==", "!=")),
+        field("right", $._expr_cmp),
+      ),
+
+    // < > <= >= (NONASSOC, prec 6). Both operands from the next-tighter tier.
+    _expr_cmp: ($) =>
+      choice(alias($._expr_cmp_b, $.binary_expression), $._expr_update),
+    _expr_cmp_b: ($) =>
+      seq(
+        field("left", $._expr_update),
+        field("operator", choice("<", ">", "<=", ">=")),
+        field("right", $._expr_update),
+      ),
+
+    // // (right-assoc, prec 7)
+    _expr_update: ($) =>
+      choice(alias($._expr_update_b, $.binary_expression), $._expr_not),
+    _expr_update_b: ($) =>
+      seq(
+        field("left", $._expr_not),
+        field("operator", "//"),
+        field("right", $._expr_update),
+      ),
+
+    // ! (unary prefix, prec 8). Operand is the next-tighter tier (so
+    // `!a + b` parses as `!(a + b)`, matching Nix). Recurses on itself
+    // for `!!a`.
+    _expr_not: ($) =>
+      choice(alias($._expr_not_u, $.unary_expression), $._expr_add),
+    _expr_not_u: ($) =>
+      seq(field("operator", "!"), field("argument", $._expr_not)),
+
+    // + - (left-assoc, prec 9)
+    _expr_add: ($) =>
+      choice(alias($._expr_add_b, $.binary_expression), $._expr_mul),
+    _expr_add_b: ($) =>
+      seq(
+        field("left", $._expr_add),
+        field("operator", choice("+", "-")),
+        field("right", $._expr_mul),
+      ),
+
+    // * / (left-assoc, prec 10)
+    _expr_mul: ($) =>
+      choice(alias($._expr_mul_b, $.binary_expression), $._expr_concat),
+    _expr_mul_b: ($) =>
+      seq(
+        field("left", $._expr_mul),
+        field("operator", choice("*", "/")),
+        field("right", $._expr_concat),
+      ),
+
+    // ++ (right-assoc, prec 11)
+    _expr_concat: ($) =>
+      choice(alias($._expr_concat_b, $.binary_expression), $._expr_has_attr),
+    _expr_concat_b: ($) =>
+      seq(
+        field("left", $._expr_has_attr),
+        field("operator", "++"),
+        field("right", $._expr_concat),
+      ),
+
+    // ? (NONASSOC, prec 12). RHS is an attrpath, not an expression.
+    // Public node type stays `has_attr_expression`.
+    _expr_has_attr: ($) => choice($.has_attr_expression, $._expr_negate),
+    has_attr_expression: ($) =>
+      seq(
+        field("expression", $._expr_negate),
+        field("operator", "?"),
+        field("attrpath", $.attrpath),
+      ),
+
+    // unary - (NONASSOC, prec 13). Highest-precedence operator.
+    // Operand is apply/select/atom only.
+    _expr_negate: ($) =>
+      choice(
+        alias($._expr_negate_u, $.unary_expression),
         $._expr_apply_expression,
       ),
+    _expr_negate_u: ($) =>
+      seq(field("operator", "-"), field("argument", $._expr_negate)),
 
-    // I choose to *not* have this among the binary operators because
-    // this is the sole exception that takes an attrpath (instead of expression)
-    // as its right operand.
-    // My gut feeling is that this is:
-    //   1) better in theory, and
-    //   2) will be easier to work with in practice.
-    has_attr_expression: ($) =>
-      prec(
-        PREC["?"],
-        seq(
-          field("expression", $._expr_op),
-          field("operator", "?"),
-          field("attrpath", $.attrpath),
-        ),
-      ),
-
+    // Public node types for unary and binary expressions are produced
+    // entirely via `alias()` from the hidden tier rules above. These
+    // explicit definitions keep `node-types.json` populated. They are
+    // unreachable from `_expr_op` (the alias-target machinery handles
+    // production), but tree-sitter requires named rules to be defined.
     unary_expression: ($) =>
       choice(
-        ...[
-          ["!", PREC.not],
-          ["-", PREC.negate],
-        ].map(([operator, precedence]) =>
-          prec(
-            precedence,
-            seq(field("operator", operator), field("argument", $._expr_op)),
-          ),
-        ),
+        seq(field("operator", "!"), field("argument", $._expr_not)),
+        seq(field("operator", "-"), field("argument", $._expr_negate)),
       ),
-
     binary_expression: ($) =>
-      choice(
-        // left assoc.
-        ...[
-          ["==", PREC.eq],
-          ["!=", PREC.neq],
-          ["<", PREC["<"]],
-          ["<=", PREC.leq],
-          [">", PREC[">"]],
-          [">=", PREC.geq],
-          ["&&", PREC.and],
-          ["||", PREC.or],
-          ["|>", PREC.piper],
-          ["+", PREC["+"]],
-          ["-", PREC["-"]],
-          ["*", PREC["*"]],
-          ["/", PREC["/"]],
-        ].map(([operator, precedence]) =>
-          prec.left(
-            precedence,
-            seq(
-              field("left", $._expr_op),
-              field("operator", operator),
-              field("right", $._expr_op),
-            ),
-          ),
-        ),
-        // right assoc.
-        ...[
-          ["<|", PREC.pipel],
-          ["->", PREC.impl],
-          ["//", PREC.update],
-          ["++", PREC.concat],
-        ].map(([operator, precedence]) =>
-          prec.right(
-            precedence,
-            seq(
-              field("left", $._expr_op),
-              field("operator", operator),
-              field("right", $._expr_op),
-            ),
-          ),
-        ),
+      seq(
+        field("left", $._expr_op),
+        field("operator", "+"),
+        field("right", $._expr_op),
       ),
 
     _expr_apply_expression: ($) =>
