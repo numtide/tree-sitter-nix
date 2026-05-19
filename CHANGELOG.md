@@ -8,6 +8,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Source tarball attached to GitHub releases. `publish.yml` now has a
+  `release-tarball` job that builds `tree-sitter-nix.tar.gz` from
+  `git ls-files` plus the generated parser sources, with reproducible
+  archive flags (fixed owner, group, sort order, and mtime) so the
+  SHA256 stays stable across rebuilds. Unlike GitHub's auto-generated
+  `/archive/...` tarballs, this one's hash is fixed — safe for
+  `fetchurl` consumers in nixpkgs / Bazel / Buck. Mirrors
+  tree-sitter's official `release.yml` reusable workflow. [#56]
 - WASM build attached to GitHub releases. `publish.yml` now has a
   `release-wasm` job that builds `tree-sitter-nix.wasm` (with
   emscripten 4.0.4, matching tree-sitter 0.25.10's pin), validates
@@ -199,6 +207,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#50]: https://github.com/numtide/tree-sitter-nix/pull/50
 [#53]: https://github.com/numtide/tree-sitter-nix/pull/53
 [#55]: https://github.com/numtide/tree-sitter-nix/pull/55
+[#56]: https://github.com/numtide/tree-sitter-nix/pull/56
 
 ## [0.3.0] — 2025-08-12 (upstream)
 
