@@ -135,3 +135,110 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" --clobber \
             tree-sitter-nix.wasm \
             tree-sitter-nix.wasm.sha256
+
+  release-tarball:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to upload release assets
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Tarball contains every git-tracked file plus the generated
+      # parser sources (parser.c, grammar.json, node-types.json,
+      # tree_sitter/*.h). We track those in git already, so the
+      # explicit append is currently a no-op — but it future-proofs
+      # against a change that stops checking generated files in.
+      #
+      # Why a custom tarball when GitHub auto-generates source
+      # archives? GitHub's auto-archives don't have stable hashes —
+      # GitHub may re-compress them at any time, breaking pinned
+      # `fetchurl` hashes in nixpkgs / Bazel / Buck consumers. This
+      # tarball is built once and stays fixed.
+      #
+      # Reproducibility caveats:
+      # - `LC_ALL=C` so `sort` collation order is locale-independent.
+      #   Without it, en_US.UTF-8 vs C.UTF-8 produce different file
+      #   orders → different SHA256.
+      # - `--mode=ugo+rX,u+w` normalizes file modes so the runner's
+      #   umask doesn't leak into the archive.
+      # - `--mtime` pins entry mtimes to the commit timestamp.
+      # - tar's `--sort=name` is dropped: it only affects recursive
+      #   directory traversal, not `-T` file lists, so it was a no-op.
+      # - tar/gzip versions are NOT pinned (ubuntu-latest stock).
+      #   DEFLATE encoding is implementation-defined, so the hash is
+      #   only stable across runs on the same image. The strong
+      #   guarantee for downstream consumers is "uploaded once, stays
+      #   fixed" — the asset itself never changes.
+      #
+      # File selection mirrors tree-sitter's official `release.yml`
+      # reusable workflow.
+      - name: Create source tarball
+        env:
+          LC_ALL: C
+        run: |
+          git ls-files > "$RUNNER_TEMP/files"
+          printf '%s\n' >> "$RUNNER_TEMP/files" \
+            src/parser.c src/scanner.c src/grammar.json src/node-types.json \
+            src/tree_sitter/parser.h src/tree_sitter/alloc.h src/tree_sitter/array.h
+          tar czf tree-sitter-nix.tar.gz \
+            --owner=0 --group=0 --numeric-owner \
+            --mode='ugo+rX,u+w' \
+            --mtime="@$(git log -1 --format=%ct)" \
+            -T <(sort -u "$RUNNER_TEMP/files")
+
+      - name: Generate checksum
+        run: sha256sum tree-sitter-nix.tar.gz > tree-sitter-nix.tar.gz.sha256
+
+      - name: Validate tarball contents
+        # Sanity-check the tarball has the must-have files for downstream
+        # consumers. A misconfigured `git ls-files` (e.g. shallow clone
+        # without LFS) would be caught here. `grep -qFx` so dots aren't
+        # treated as regex wildcards.
+        run: |
+          listing=$(tar tzf tree-sitter-nix.tar.gz)
+          required=(
+            grammar.js
+            tree-sitter.json
+            LICENSE
+            src/parser.c
+            src/scanner.c
+            src/grammar.json
+            src/node-types.json
+            src/tree_sitter/parser.h
+            src/tree_sitter/alloc.h
+            src/tree_sitter/array.h
+            queries/highlights.scm
+            queries/injections.scm
+            queries/locals.scm
+            queries/tags.scm
+            queries/indents.scm
+            queries/folds.scm
+            bindings/rust/lib.rs
+            bindings/node/index.js
+          )
+          for f in "${required[@]}"; do
+            if ! grep -qFx "$f" <<< "$listing"; then
+              echo "::error::Required file missing from tarball: $f"
+              exit 1
+            fi
+          done
+          echo "OK: $(wc -l <<< "$listing") files, all ${#required[@]} required entries present"
+
+      - name: Upload artifacts (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: tree-sitter-nix-tarball
+          path: |
+            tree-sitter-nix.tar.gz
+            tree-sitter-nix.tar.gz.sha256
+
+      - name: Upload release assets (tag push)
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            tree-sitter-nix.tar.gz \
+            tree-sitter-nix.tar.gz.sha256
