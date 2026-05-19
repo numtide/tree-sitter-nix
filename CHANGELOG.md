@@ -43,13 +43,16 @@ follow [Semantic Versioning](https://semver.org/).
   expressions like `1 == 2 == 3` and `1 < 2 < 3` are now parse errors,
   exactly as in Nix. Cross-tier mixing like `1 == 2 < 3` and
   parenthesized chains like `(1 == 2) == 3` continue to parse.
-  Implemented via a layered expression hierarchy (one hidden rule per
-  precedence tier), validated against `nix-instantiate` on a 341-case
-  cross-check matrix (committed at `test/oracle/`) that compares both
-  accept/reject AND parse-tree grouping. The public `binary_expression`,
-  `unary_expression`, and `has_attr_expression` node types are
-  unchanged. The top-5 connector tiers are inlined to recover ~1/3 of
-  the parse-speed cost of the deeper hierarchy. Closes [#52]. [#58]
+  Implemented with a hybrid grammar: only the two non-associative
+  tiers are separate structural rules (so a chain cannot be derived),
+  while every associative operator stays in a flat `prec`-annotated
+  rule — the same fast encoding used before #52. Validated against
+  `nix-instantiate` on a 341-case cross-check matrix (committed at
+  `test/oracle/`) that compares both accept/reject AND parse-tree
+  grouping. The public `binary_expression`, `unary_expression`, and
+  `has_attr_expression` node types — and the entire `node-types.json`
+  — are byte-identical to the previous flat grammar. Closes [#52].
+  [#58], [#59]
 
 ## [0.5.0] — 2026-05-18
 
@@ -237,6 +240,7 @@ follow [Semantic Versioning](https://semver.org/).
 [#56]: https://github.com/numtide/tree-sitter-nix/pull/56
 [#57]: https://github.com/numtide/tree-sitter-nix/pull/57
 [#58]: https://github.com/numtide/tree-sitter-nix/pull/58
+[#59]: https://github.com/numtide/tree-sitter-nix/pull/59
 
 ## [0.3.0] — 2025-08-12 (upstream)
 
