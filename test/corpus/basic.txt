@@ -1011,6 +1011,41 @@ unary not over minus
         (identifier)))))
 
 ====================
+unary not as RHS of addition (Nix has ! at lower prec than +)
+====================
+
+a + !b
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (unary_expression
+      (variable_expression
+        (identifier)))))
+
+====================
+unary not as RHS of addition extends operand over the next +
+====================
+
+a + !b + c
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (unary_expression
+      (binary_expression
+        (variable_expression
+          (identifier))
+        (variable_expression
+          (identifier))))))
+
+====================
 parens
 ====================
 

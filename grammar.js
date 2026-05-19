@@ -339,6 +339,17 @@ module.exports = grammar({
     // looser one in the conflict states. These prec annotations are
     // ONLY exercised in the `- ! ...` conflict states; the rest of the
     // grammar's precedence is encoded by the tier structure.
+    // The RHS of `+ - * / ++` admits a `!`-headed expression in
+    // addition to the next-tighter tier. Nix has `!` (prec 8) BELOW
+    // `+` (prec 9), which is unusual — most languages put `!` at the
+    // top. So `a + !b` is valid Nix (`a + (!b)`), but in a strict
+    // tier hierarchy, `+`'s RHS would be `_expr_mul` (tier 10) which
+    // can't reach `!` (tier 8). The `_expr_prefix_rhs` escape hatch
+    // lets `!` start the RHS; `!`'s own operand reach is determined
+    // by the `_expr_not` rule. Conflicts are resolved by the
+    // escalating `prec.left`/`prec.right` annotations.
+    _expr_prefix_rhs: ($) => alias($._expr_not_u, $.unary_expression),
+
     _expr_add: ($) =>
       choice(alias($._expr_add_b, $.binary_expression), $._expr_mul),
     _expr_add_b: ($) =>
@@ -347,7 +358,7 @@ module.exports = grammar({
         seq(
           field("left", $._expr_add),
           field("operator", choice("+", "-")),
-          field("right", $._expr_mul),
+          field("right", choice($._expr_mul, $._expr_prefix_rhs)),
         ),
       ),
 
@@ -360,7 +371,7 @@ module.exports = grammar({
         seq(
           field("left", $._expr_mul),
           field("operator", choice("*", "/")),
-          field("right", $._expr_concat),
+          field("right", choice($._expr_concat, $._expr_prefix_rhs)),
         ),
       ),
 
@@ -373,7 +384,7 @@ module.exports = grammar({
         seq(
           field("left", $._expr_has_attr),
           field("operator", "++"),
-          field("right", $._expr_concat),
+          field("right", choice($._expr_concat, $._expr_prefix_rhs)),
         ),
       ),
 
