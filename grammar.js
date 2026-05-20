@@ -28,7 +28,15 @@ module.exports = grammar({
 
   supertypes: ($) => [$._expression, $.comment],
 
-  inline: ($) => [],
+  // Inline the passthrough precedence connectors. The hybrid operator
+  // grammar (#52) keeps only the two NONASSOC tiers as separate
+  // structural rules; the rest are flat. The remaining connector rules
+  // (`_expr_op`, `_expr_pipe`) are single/low-branching passthroughs
+  // whose unit reductions are pure overhead — inlining replaces their
+  // usages with copies and removes those reductions. The flat tiers
+  // (`_expr_low`, `_expr_high`) are NOT inlined: they have multiple
+  // alternatives and inlining them multiplies the state count.
+  inline: ($) => [$._expr_op, $._expr_pipe],
 
   externals: ($) => [
     $.string_fragment,
@@ -197,85 +205,206 @@ module.exports = grammar({
         field("alternative", $._expression),
       ),
 
-    _expr_op: ($) =>
+    // ====================================================================
+    // Operator-expression hierarchy (issue #52)
+    // ====================================================================
+    //
+    // Only the two NONASSOC tiers (== != and < > <= >=) need to be
+    // separate structural rules: they constrain their operands to a
+    // tighter tier so a chain like `a == b == c` cannot be derived.
+    // Everything else is left/right-associative and lives in a flat
+    // rule with `prec.left`/`prec.right` — the fast, idiomatic
+    // tree-sitter encoding (this is how the grammar worked before #52).
+    //
+    // The crucial safety distinction vs. PR #51: the `prec` here is
+    // INTRA-rule (operators within one flat `choice`), which tree-sitter
+    // resolves correctly. PR #51's precedence inversion came from `prec`
+    // ACROSS separate rules, which `prec` does not arbitrate.
+    //
+    // Tiers, lowest to highest precedence:
+    //
+    //   _expr_pipe : |> <|              (kept separate — |> and <| are
+    //                                    mutually exclusive, which a flat
+    //                                    rule cannot express)
+    //   _expr_low  : -> || &&           (flat, prec 2-4)
+    //   _expr_eq   : == !=              (NONASSOC, prec 5)
+    //   _expr_cmp  : < > <= >=          (NONASSOC, prec 6)
+    //   _expr_high : // ! + - * / ++ ?  unary - (flat, prec 7-13)
+    //
+    // A plain (operator-free) expression reduces through ~6 tiers
+    // instead of ~13, roughly halving the unit-reduction cost that the
+    // fully-layered grammar paid on every value.
+
+    _expr_op: ($) => $._expr_pipe,
+
+    // |> (left-assoc) <| (right-assoc) — Nix 2.24+ pipes, lowest prec.
+    //
+    // Nix declares these as two SEPARATE productions (expr_pipe_into and
+    // expr_pipe_from), not one nonassoc tier, and the two are mutually
+    // exclusive in BOTH directions — `1 |> f <| g` and `1 <| f |> g` are
+    // both syntax errors. We mirror that exactly: each direction chains
+    // only with ITSELF (the chaining operand is the same pipe rule), and
+    // the non-chaining operand is `_expr_low` (which excludes both
+    // pipes). So:
+    //   a |> b |> c  -> (a |> b) |> c   (left-assoc, via _expr_pipe_l.left)
+    //   a <| b <| c  -> a <| (b <| c)   (right-assoc, via _expr_pipe_r.right)
+    //   a |> b <| c  -> ERROR  (|>'s right is _expr_low, no <|)
+    //   a <| b |> c  -> ERROR  (<|'s right is _expr_pipe_r, no |>)
+    _expr_pipe: ($) =>
       choice(
-        $.has_attr_expression,
-        $.unary_expression,
-        $.binary_expression,
-        $._expr_apply_expression,
+        alias($._expr_pipe_l, $.binary_expression),
+        alias($._expr_pipe_r, $.binary_expression),
+        $._expr_low,
+      ),
+    _expr_pipe_l: ($) =>
+      seq(
+        field(
+          "left",
+          choice(alias($._expr_pipe_l, $.binary_expression), $._expr_low),
+        ),
+        field("operator", "|>"),
+        field("right", $._expr_low),
+      ),
+    _expr_pipe_r: ($) =>
+      prec.right(
+        seq(
+          field("left", $._expr_low),
+          field("operator", "<|"),
+          field(
+            "right",
+            choice(alias($._expr_pipe_r, $.binary_expression), $._expr_low),
+          ),
+        ),
       ),
 
-    // I choose to *not* have this among the binary operators because
-    // this is the sole exception that takes an attrpath (instead of expression)
-    // as its right operand.
-    // My gut feeling is that this is:
-    //   1) better in theory, and
-    //   2) will be easier to work with in practice.
+    // -> (right, prec 2) || (left, prec 3) && (left, prec 4).
+    // Flat rule; operands are `_expr_low` so they chain among themselves
+    // and fall through to the nonassoc tiers. Intra-rule prec sorts the
+    // three operators.
+    _expr_low: ($) =>
+      choice(alias($._expr_low_b, $.binary_expression), $._expr_eq),
+    _expr_low_b: ($) =>
+      choice(
+        prec.right(
+          PREC.impl,
+          seq(
+            field("left", $._expr_low),
+            field("operator", "->"),
+            field("right", $._expr_low),
+          ),
+        ),
+        prec.left(
+          PREC.or,
+          seq(
+            field("left", $._expr_low),
+            field("operator", "||"),
+            field("right", $._expr_low),
+          ),
+        ),
+        prec.left(
+          PREC.and,
+          seq(
+            field("left", $._expr_low),
+            field("operator", "&&"),
+            field("right", $._expr_low),
+          ),
+        ),
+      ),
+
+    // == != (NONASSOC, prec 5). Operands are `_expr_cmp` (one tier
+    // tighter), so `a == b == c` cannot be derived.
+    _expr_eq: ($) =>
+      choice(alias($._expr_eq_b, $.binary_expression), $._expr_cmp),
+    _expr_eq_b: ($) =>
+      seq(
+        field("left", $._expr_cmp),
+        field("operator", choice("==", "!=")),
+        field("right", $._expr_cmp),
+      ),
+
+    // < > <= >= (NONASSOC, prec 6). Operands are `_expr_high`.
+    _expr_cmp: ($) =>
+      choice(alias($._expr_cmp_b, $.binary_expression), $._expr_high),
+    _expr_cmp_b: ($) =>
+      seq(
+        field("left", $._expr_high),
+        field("operator", choice("<", ">", "<=", ">=")),
+        field("right", $._expr_high),
+      ),
+
+    // The high-precedence band: // (right, 7), ! (unary, 8),
+    // + - (left, 9), * / (left, 10), ++ (right, 11), ? (12),
+    // unary - (13). All flat with operands `_expr_high`; intra-rule
+    // prec sorts them. This mirrors the pre-#52 flat grammar, restricted
+    // to the operators above the nonassoc band — so it inherits that
+    // grammar's correct, conflict-free precedence handling, including
+    // the unusual `!` < `+` ordering (`!a + b` is `!(a + b)`,
+    // `a + !b` is `a + (!b)`) and the prefix-prefix non-conflict
+    // (`-!a`, `!-a`).
+    _expr_high: ($) =>
+      choice(
+        alias($._expr_high_b, $.binary_expression),
+        alias($._expr_high_u, $.unary_expression),
+        $.has_attr_expression,
+        $._expr_apply_expression,
+      ),
+    _expr_high_b: ($) =>
+      choice(
+        prec.right(
+          PREC.update,
+          seq(
+            field("left", $._expr_high),
+            field("operator", "//"),
+            field("right", $._expr_high),
+          ),
+        ),
+        prec.left(
+          PREC["+"],
+          seq(
+            field("left", $._expr_high),
+            field("operator", choice("+", "-")),
+            field("right", $._expr_high),
+          ),
+        ),
+        prec.left(
+          PREC["*"],
+          seq(
+            field("left", $._expr_high),
+            field("operator", choice("*", "/")),
+            field("right", $._expr_high),
+          ),
+        ),
+        prec.right(
+          PREC.concat,
+          seq(
+            field("left", $._expr_high),
+            field("operator", "++"),
+            field("right", $._expr_high),
+          ),
+        ),
+      ),
+    _expr_high_u: ($) =>
+      choice(
+        prec(
+          PREC.not,
+          seq(field("operator", "!"), field("argument", $._expr_high)),
+        ),
+        prec(
+          PREC.negate,
+          seq(field("operator", "-"), field("argument", $._expr_high)),
+        ),
+      ),
+
+    // ? (prec 12). RHS is an attrpath, not an expression. Left-recursive
+    // (`a ? b ? c` is `(a ? b) ? c`) because the attrpath RHS means a
+    // following `?` never conflicts.
     has_attr_expression: ($) =>
       prec(
         PREC["?"],
         seq(
-          field("expression", $._expr_op),
+          field("expression", $._expr_high),
           field("operator", "?"),
           field("attrpath", $.attrpath),
-        ),
-      ),
-
-    unary_expression: ($) =>
-      choice(
-        ...[
-          ["!", PREC.not],
-          ["-", PREC.negate],
-        ].map(([operator, precedence]) =>
-          prec(
-            precedence,
-            seq(field("operator", operator), field("argument", $._expr_op)),
-          ),
-        ),
-      ),
-
-    binary_expression: ($) =>
-      choice(
-        // left assoc.
-        ...[
-          ["==", PREC.eq],
-          ["!=", PREC.neq],
-          ["<", PREC["<"]],
-          ["<=", PREC.leq],
-          [">", PREC[">"]],
-          [">=", PREC.geq],
-          ["&&", PREC.and],
-          ["||", PREC.or],
-          ["|>", PREC.piper],
-          ["+", PREC["+"]],
-          ["-", PREC["-"]],
-          ["*", PREC["*"]],
-          ["/", PREC["/"]],
-        ].map(([operator, precedence]) =>
-          prec.left(
-            precedence,
-            seq(
-              field("left", $._expr_op),
-              field("operator", operator),
-              field("right", $._expr_op),
-            ),
-          ),
-        ),
-        // right assoc.
-        ...[
-          ["<|", PREC.pipel],
-          ["->", PREC.impl],
-          ["//", PREC.update],
-          ["++", PREC.concat],
-        ].map(([operator, precedence]) =>
-          prec.right(
-            precedence,
-            seq(
-              field("left", $._expr_op),
-              field("operator", operator),
-              field("right", $._expr_op),
-            ),
-          ),
         ),
       ),
 

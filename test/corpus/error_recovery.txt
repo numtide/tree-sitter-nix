@@ -174,11 +174,14 @@ bind typing parenthesis
       (binding
         (attrpath
           (identifier))
-        (ERROR
+        (parenthesized_expression
           (function_expression
             (identifier)
-            (variable_expression (identifier))))
-        (attrset_expression))
+            (apply_expression
+              (variable_expression (identifier))
+              (ERROR)
+              (attrset_expression)))
+          (MISSING ")")))
       (binding
         (attrpath
           (identifier))

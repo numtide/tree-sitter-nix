@@ -831,6 +831,275 @@ pipe operators
       (identifier))))
 
 ====================
+pipe into chains left-associatively
+====================
+
+a |> b |> c
+
+---
+
+(source_code
+  (binary_expression
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+====================
+pipe from chains right-associatively
+====================
+
+a <| b <| c
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))))
+
+====================
+mixing pipe directions is a syntax error
+====================
+
+a |> b <| c
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (ERROR
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+====================
+chained equality is a syntax error (matches Nix's %nonassoc)
+====================
+
+1 == 2 == 3
+
+---
+
+(source_code
+  (binary_expression
+    (integer_expression)
+    (ERROR
+      (integer_expression))
+    (integer_expression)))
+
+====================
+chained comparison is a syntax error (matches Nix's %nonassoc)
+====================
+
+1 < 2 < 3
+
+---
+
+(source_code
+  (binary_expression
+    (integer_expression)
+    (ERROR
+      (integer_expression))
+    (integer_expression)))
+
+====================
+mixed equality/comparison precedence (cmp binds tighter than eq)
+====================
+
+1 == 2 < 3
+
+---
+
+(source_code
+  (binary_expression
+    (integer_expression)
+    (binary_expression
+      (integer_expression)
+      (integer_expression))))
+
+====================
+addition binds tighter than equality
+====================
+
+a + b == c
+
+---
+
+(source_code
+  (binary_expression
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+====================
+unary not binds tighter than equality
+====================
+
+!a == b
+
+---
+
+(source_code
+  (binary_expression
+    (unary_expression
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+====================
+unary not in chained equality is still a syntax error
+====================
+
+!a == b == c
+
+---
+
+(source_code
+  (binary_expression
+    (unary_expression
+      (variable_expression
+        (identifier)))
+    (ERROR
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+====================
+parenthesized chained comparison is valid
+====================
+
+(1 == 2) == 3
+
+---
+
+(source_code
+  (binary_expression
+    (parenthesized_expression
+      (binary_expression
+        (integer_expression)
+        (integer_expression)))
+    (integer_expression)))
+
+====================
+chained has-attr is valid (left-recursive)
+====================
+
+a ? b ? c
+
+---
+
+(source_code
+  (has_attr_expression
+    (has_attr_expression
+      (variable_expression
+        (identifier))
+      (attrpath
+        (identifier)))
+    (attrpath
+      (identifier))))
+
+====================
+unary minus over not
+====================
+
+-!a
+
+---
+
+(source_code
+  (unary_expression
+    (unary_expression
+      (variable_expression
+        (identifier)))))
+
+====================
+unary minus over not extends operand over addition
+====================
+
+-!a + b
+
+---
+
+(source_code
+  (unary_expression
+    (unary_expression
+      (binary_expression
+        (variable_expression
+          (identifier))
+        (variable_expression
+          (identifier))))))
+
+====================
+unary not over minus
+====================
+
+!-a + b
+
+---
+
+(source_code
+  (unary_expression
+    (binary_expression
+      (unary_expression
+        (variable_expression
+          (identifier)))
+      (variable_expression
+        (identifier)))))
+
+====================
+unary not as RHS of addition (Nix has ! at lower prec than +)
+====================
+
+a + !b
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (unary_expression
+      (variable_expression
+        (identifier)))))
+
+====================
+unary not as RHS of addition extends operand over the next +
+====================
+
+a + !b + c
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (unary_expression
+      (binary_expression
+        (variable_expression
+          (identifier))
+        (variable_expression
+          (identifier))))))
+
+====================
 parens
 ====================
 
