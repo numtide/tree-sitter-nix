@@ -207,41 +207,8 @@ module.exports = grammar({
 
     // ====================================================================
     // Operator-expression hierarchy (issue #52)
-    //
-    // Each precedence tier has its own hidden rule. Precedence and
-    // associativity are encoded structurally — by which tier each rule's
-    // operands draw from — not by `prec()` annotations, which only resolve
-    // shift/reduce conflicts within a single rule (not across rules).
-    //
-    // This is the textbook layered LR grammar. It mirrors Nix's bison
-    // declarations, including the `%nonassoc` levels:
-    //
-    //   %right IMPL                       -> _expr_impl
-    //   %left OR                          -> _expr_or
-    //   %left AND                         -> _expr_and
-    //   %nonassoc EQ NEQ                  -> _expr_eq      (NONASSOC)
-    //   %nonassoc '<' '>' LEQ GEQ         -> _expr_cmp     (NONASSOC)
-    //   %right UPDATE                     -> _expr_update
-    //   %left NOT                         -> _expr_not     (unary)
-    //   %left '+' '-'                     -> _expr_add
-    //   %left '*' '/'                     -> _expr_mul
-    //   %right CONCAT                     -> _expr_concat
-    //   %nonassoc '?'                     -> has_attr      (attrpath RHS)
-    //   %nonassoc NEGATE                  -> _expr_negate  (unary)
-    //
-    // The pipe operators (`|>` left-assoc, `<|` right-assoc) sit BELOW
-    // implication.
-    //
-    // Every rule that produces a binary operator is `alias()`'d to
-    // `binary_expression` so the public AST node type is unchanged —
-    // existing queries and consumers keep working.
-    //
-    // Non-assoc tiers (`_expr_eq`, `_expr_cmp`, `has_attr`) constrain BOTH
-    // operands to the next-tighter tier, so a chain like `a == b == c`
-    // cannot be derived: the left operand of the outer `==` would need to
-    // be `_expr_eq`, but `_expr_eq` is excluded.
     // ====================================================================
-
+    //
     // Only the two NONASSOC tiers (== != and < > <= >=) need to be
     // separate structural rules: they constrain their operands to a
     // tighter tier so a chain like `a == b == c` cannot be derived.
@@ -271,9 +238,18 @@ module.exports = grammar({
     _expr_op: ($) => $._expr_pipe,
 
     // |> (left-assoc) <| (right-assoc) — Nix 2.24+ pipes, lowest prec.
-    // Separate l/r productions keep them mutually exclusive: the operand
-    // of each is `_expr_low`, which excludes the other pipe, so
-    // `1 |> f <| g` is rejected (matching Nix).
+    //
+    // Nix declares these as two SEPARATE productions (expr_pipe_into and
+    // expr_pipe_from), not one nonassoc tier, and the two are mutually
+    // exclusive in BOTH directions — `1 |> f <| g` and `1 <| f |> g` are
+    // both syntax errors. We mirror that exactly: each direction chains
+    // only with ITSELF (the chaining operand is the same pipe rule), and
+    // the non-chaining operand is `_expr_low` (which excludes both
+    // pipes). So:
+    //   a |> b |> c  -> (a |> b) |> c   (left-assoc, via _expr_pipe_l.left)
+    //   a <| b <| c  -> a <| (b <| c)   (right-assoc, via _expr_pipe_r.right)
+    //   a |> b <| c  -> ERROR  (|>'s right is _expr_low, no <|)
+    //   a <| b |> c  -> ERROR  (<|'s right is _expr_pipe_r, no |>)
     _expr_pipe: ($) =>
       choice(
         alias($._expr_pipe_l, $.binary_expression),
@@ -282,7 +258,10 @@ module.exports = grammar({
       ),
     _expr_pipe_l: ($) =>
       seq(
-        field("left", $._expr_pipe),
+        field(
+          "left",
+          choice(alias($._expr_pipe_l, $.binary_expression), $._expr_low),
+        ),
         field("operator", "|>"),
         field("right", $._expr_low),
       ),
@@ -291,7 +270,10 @@ module.exports = grammar({
         seq(
           field("left", $._expr_low),
           field("operator", "<|"),
-          field("right", $._expr_pipe),
+          field(
+            "right",
+            choice(alias($._expr_pipe_r, $.binary_expression), $._expr_low),
+          ),
         ),
       ),
 

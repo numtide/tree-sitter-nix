@@ -831,6 +831,60 @@ pipe operators
       (identifier))))
 
 ====================
+pipe into chains left-associatively
+====================
+
+a |> b |> c
+
+---
+
+(source_code
+  (binary_expression
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+====================
+pipe from chains right-associatively
+====================
+
+a <| b <| c
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (binary_expression
+      (variable_expression
+        (identifier))
+      (variable_expression
+        (identifier)))))
+
+====================
+mixing pipe directions is a syntax error
+====================
+
+a |> b <| c
+
+---
+
+(source_code
+  (binary_expression
+    (variable_expression
+      (identifier))
+    (ERROR
+      (variable_expression
+        (identifier)))
+    (variable_expression
+      (identifier))))
+
+====================
 chained equality is a syntax error (matches Nix's %nonassoc)
 ====================
 

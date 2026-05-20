@@ -62,7 +62,11 @@ def nix_parse(expr: str) -> str | None:
     # Wrap in a function so identifiers are bound (avoids "undefined variable").
     wrapped = f"a: b: c: d: e: f: g: ({expr})"
     p = subprocess.run(
-        ["nix-instantiate", "--parse", "--expr", wrapped],
+        # pipe-operators is needed for |> / <| to lex at all on Nix 2.24+.
+        # Harmless for every other expression.
+        ["nix-instantiate", "--parse",
+         "--extra-experimental-features", "pipe-operators",
+         "--expr", wrapped],
         capture_output=True, text=True,
     )
     if p.returncode != 0:
@@ -423,6 +427,14 @@ def gen_extra_matrix() -> list[dict]:
         cases.append({"kind": "raw", "expr": f"a {op} !b * c", "expect_ok": True})
     cases.append({"kind": "raw", "expr": "a + -!b * c", "expect_ok": True})
     cases.append({"kind": "raw", "expr": "a / !-b", "expect_ok": True})
+    # Pipe operators (Nix 2.24+). |> and <| are mutually exclusive in BOTH
+    # directions — chaining one with itself is fine, mixing is a syntax error.
+    cases.append({"kind": "raw", "expr": "a |> b", "expect_ok": True})
+    cases.append({"kind": "raw", "expr": "a <| b", "expect_ok": True})
+    cases.append({"kind": "raw", "expr": "a |> b |> c", "expect_ok": True})
+    cases.append({"kind": "raw", "expr": "a <| b <| c", "expect_ok": True})
+    cases.append({"kind": "raw", "expr": "a |> b <| c", "expect_ok": False})
+    cases.append({"kind": "raw", "expr": "a <| b |> c", "expect_ok": False})
     return cases
 
 
