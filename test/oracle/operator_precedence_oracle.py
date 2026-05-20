@@ -45,16 +45,6 @@ TIERS = [
     (["++"], "right"),       # concat
 ]
 ALL_BIN_OPS = [op for ops, _ in TIERS for op in ops]
-PIPE_OPS = ["|>", "<|"]  # experimental, gate on availability
-
-
-def _has_pipe_operators() -> bool:
-    """Check if local nix-instantiate supports pipe-operators."""
-    p = subprocess.run(
-        ["nix-instantiate", "--parse", "--expr", "let f = x: x; in 1 |> f"],
-        capture_output=True, text=True,
-    )
-    return p.returncode == 0
 
 
 def nix_parse(expr: str) -> str | None:
