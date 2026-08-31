@@ -159,18 +159,43 @@ will pick up changes on next flake update. Published-registry
 strategy:
 
 - **Nix flake** — ready to consume immediately.
-- **crates.io / PyPI / npm** — planned under a numtide-scoped name
-  (existing packages under the bare name are controlled by upstream).
-  Tracking in [#14](https://github.com/numtide/tree-sitter-nix/issues/14).
+- **crates.io** — `publish.yml` attempts to publish `tree-sitter-nix`
+  on every tag push (idempotent: an already-published version is
+  skipped). This only works while the org `CRATES_IO_TOKEN` belongs to
+  a crate owner; the alternative is a numtide-scoped name, tracked in
+  [#14](https://github.com/numtide/tree-sitter-nix/issues/14).
+- **PyPI / npm** — planned under a numtide-scoped name (existing
+  packages under the bare name are controlled by upstream). Tracking
+  in [#14](https://github.com/numtide/tree-sitter-nix/issues/14).
 
 ### Release artifacts and provenance
 
-Each release attaches `tree-sitter-nix.wasm` (for web tree-sitter
-consumers) and `tree-sitter-nix.tar.gz` (a reproducible source
-tarball with a stable hash, unlike GitHub's auto-generated
-`/archive/...` tarballs), plus SHA256 checksums for both.
+Starting with the first tag after v0.5.0, each GitHub release carries
+four assets (v0.4.0 and v0.5.0 predate the asset jobs and have none):
 
-Both artifacts carry [SLSA build provenance attestations](https://slsa.dev/provenance)
+| asset                           | what it is                                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `tree-sitter-nix.wasm`          | parser for web-tree-sitter consumers                                                                                      |
+| `tree-sitter-nix.wasm.sha256`   | `sha256sum` sidecar; its `#` comment lines record the exact `tree-sitter-cli` and emscripten versions that built the blob |
+| `tree-sitter-nix.tar.gz`        | source tarball with a stable hash (unlike GitHub's auto-generated `/archive/...` tarballs, which may be re-compressed)    |
+| `tree-sitter-nix.tar.gz.sha256` | `sha256sum` sidecar; records the commit the tarball was built from                                                        |
+
+The `.wasm` is built with the tree-sitter CLI that generated
+`src/parser.c` (currently 0.25.10, with emscripten 4.0.4 — the pair is
+asserted in CI). The digest of a tree-sitter WASM build depends on the
+CLI version, so a `.wasm` you build yourself with a different CLI will
+have a different hash from the released one even though it parses
+identically; compare against the CLI named in the sidecar.
+
+To check an asset you downloaded (the sidecars are plain `sha256sum`
+output, comments included):
+
+```bash
+sha256sum -c --strict tree-sitter-nix.wasm.sha256
+sha256sum -c --strict tree-sitter-nix.tar.gz.sha256
+```
+
+Both the `.wasm` and the tarball carry [SLSA build provenance attestations](https://slsa.dev/provenance)
 signed via [Sigstore](https://www.sigstore.dev/) and recorded in the
 public Rekor transparency log. To verify an artifact was built by
 this repo's CI from the tagged commit:
@@ -181,7 +206,24 @@ gh attestation verify tree-sitter-nix.tar.gz --repo numtide/tree-sitter-nix
 ```
 
 If the artifact was tampered with after publication, or built outside
-the official CI, verification fails. Requires `gh` ≥ 2.49.
+the official CI, verification fails. Requires `gh` ≥ 2.49. The crate
+on crates.io is not attested (crates.io has its own provenance
+roadmap).
+
+How a release is cut: push the tag; `publish.yml` builds and checks
+everything, creates the GitHub release as a **draft** if nobody has
+created it yet, uploads the assets, and ends with a `verify-release`
+job that re-downloads the assets and fails if any asset, checksum, or
+attestation is missing. A maintainer then edits the notes and
+publishes the draft. To exercise the whole pipeline without releasing
+anything, dispatch it against an existing tag:
+
+```bash
+gh workflow run publish.yml -f tag=v0.5.0
+```
+
+That run builds from the tag and reports (as warnings) what the tag's
+release is missing.
 
 ## Acknowledgements
 

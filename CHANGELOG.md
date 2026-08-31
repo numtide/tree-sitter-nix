@@ -8,6 +8,80 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `workflow_dispatch` input `tag` on `publish.yml` to dry-run the whole
+  release pipeline against an existing tag
+  (`gh workflow run publish.yml -f tag=v0.5.0`): checks out the tag,
+  builds every asset, and reports what the tag's release is missing as
+  warnings. Nothing is uploaded, attested, or published on dispatch.
+  (R1-033, R2-026)
+- `verify-release` job at the end of `publish.yml`: re-downloads the
+  release assets, checks that all four (`.wasm`, `.wasm.sha256`,
+  `.tar.gz`, `.tar.gz.sha256`) are present, runs
+  `sha256sum -c --strict`, compares the released `.wasm` byte-for-byte
+  with the one the run built, runs `gh attestation verify` on both
+  artifacts, and polls crates.io for the crate version. Fatal on tag
+  push, warnings on dispatch. (R1-033, R2-026)
+- Measurement harness under `test/bench/` wired into the Makefile, so
+  the numbers the audit measured by hand can be re-measured with one
+  command each: `make bench` (`tree-sitter parse` over
+  `test/bench/sample2000.txt`, run alternately with a reference parser
+  (`BASELINE_SO`) so machine load hits both, gated on the ratio of
+  medians (`BENCH_THRESHOLD`) against `test/bench/baseline.json`,
+  written by `make bench-baseline`; needs CLI >= 0.27 for
+  `parse --lib-path`), `make memory` (bytes per node, hidden
+  nodes, RSS; `THRESHOLD`), `make incremental` (an incremental reparse must equal a
+  fresh parse over `test/bench/incremental-sample.txt`, `INCR_MAX`),
+  `make fuzz` (fixed seed), `make fuzz-asan` (ASan/UBSan over the
+  corpus plus the pathological inputs from `test/bench/gen_patho.py`)
+  and `make bench-baseline`. Every `tree-sitter` invocation from
+  `make` now runs with a private `TREE_SITTER_LIBDIR` under `build/`,
+  so concurrent jobs no longer share the CLI's compiled-parser cache
+  (R2-036). `make test` also compiles all six `queries/*.scm` files.
+- Oracles under `test/oracle/`: `differential.py` (accept/reject of
+  every file in the nix, rnix-parser and snix test corpora against
+  `nix-instantiate --parse`, with the 16 known disagreements committed
+  as `baselines/differential-disagreements.tsv`), `shape/compare.py`
+  (`ts2nix.py` prints the tree-sitter AST back as Nix and
+  `nix-instantiate --parse` must yield the same normal form, over a
+  3000-path nixpkgs sample in `shape/sample.txt`), and
+  `fetch-corpora.sh` with the corpus revisions pinned in
+  `corpora.lock`. Exposed as `make oracle`, `make differential`,
+  `make shape-oracle` and as the flake checks `oracle-precedence`,
+  `oracle-differential`, `oracle-shape`.
+- `tree-sitter-cli` 0.25.10 as a `devDependency` (and a `files` list)
+  in `package.json`, so `npm ci && npx tree-sitter` gives the
+  generator that produced `src/parser.c` on a clean machine; the
+  `generator-version` flake check fails when the flake's tree-sitter
+  drifts from the `@generated` header. (R1-011, R2-029)
+- `.github/workflows/ci.yml`: the repo had no CI on pull requests. The
+  new workflow runs on every PR and on `master`: generated sources
+  must match what the pinned CLI emits (`tree-sitter generate --abi 15`
+  then `git diff --exit-code -- src/`), corpus tests and a fixed-seed
+  fuzz, every `queries/*.scm` compiles, the three oracles against
+  `nix-instantiate` and the reference corpora (cached by the hash of
+  `test/oracle/corpora.lock`), `nix flake check --no-build`, and one
+  job per binding (rust, python, go strict; node and zig
+  `continue-on-error` until R1-004/R1-063 are fixed). Each job runs
+  the CLI with a private `TREE_SITTER_LIBDIR` (R2-036).
+- `.github/workflows/nightly.yml`: the non-blocking measurement loop
+  from the audit, on a daily cron and on demand. It parses all of
+  nixpkgs with a gate of zero failed parses and counts `MISSING` nodes
+  on a fixed sample (R1-049), benchmarks HEAD against a parser built
+  from the baseline's commit (CLI `tree_sitter_cli` from
+  `baseline.json`, 0.27.0), and runs the `memory`, `incremental` and
+  `fuzz-asan` harness targets against a libtree-sitter built from the
+  generator's own tree-sitter tag. The sample lists are only valid at
+  the nixpkgs revision recorded as `nixpkgs_rev` in `baseline.json`,
+  which is the one these jobs check out (the PR oracles follow
+  `flake.lock`; `test/oracle/shape/sample.txt` is drawn from that
+  pin). Results are uploaded as workflow artifacts; nothing in it
+  gates a PR.
+- `flake.nix`: the generator version is read from the `@generated`
+  header of `src/parser.c` instead of being hard-coded, a
+  `generator-version` check fails when nixpkgs' `tree-sitter` moves
+  away from it, the version of record is `package.json` (R1-032), and
+  the reference corpora for the oracle checks are fetched at the
+  revisions in `test/oracle/corpora.lock`.
 - SLSA build provenance attestations for release artifacts. The
   `release-wasm` and `release-tarball` jobs now generate a
   cryptographically signed attestation tying each artifact's digest
@@ -36,8 +110,62 @@ follow [Semantic Versioning](https://semver.org/).
   GitHub release on tag push via `gh release upload`. Closes [#14].
   [#55]
 
+### Changed
+
+- `cargo publish` in `publish.yml` is idempotent: the job reads the
+  crate name and version from `Cargo.toml` via `cargo metadata` and
+  skips the publish when crates.io already serves that version, so a
+  re-run after a partially failed release is green instead of red.
+- The WASM toolchain is a single pinned pair,
+  `TREE_SITTER_CLI_VERSION` (0.25.10) and `EMSCRIPTEN_VERSION` (4.0.4),
+  asserted in three places before anything is built: the `@generated`
+  header of `src/parser.c` must name that CLI, the installed
+  `tree-sitter --version` and `emcc --version` must match, and
+  tree-sitter's own `cli/loader/emscripten-version` at that tag must
+  equal the emsdk pin. CLI ≥ 0.26 ignores emsdk and downloads an
+  unpinned wasi-sdk, so a silent bump can no longer change the blob.
+  (R2-030)
+- `tree-sitter-nix.wasm.sha256` records the exact `tree-sitter-cli`
+  and emscripten versions in `#` comment lines (accepted by
+  `sha256sum -c --strict`); the tarball sidecar records the source
+  commit. The digest of a tree-sitter WASM build depends on the CLI
+  version, so the note tells consumers which CLI to rebuild with for
+  a matching hash. The README release section documents the assets,
+  how to verify them, and the CLI caveat. (R2-034)
+
 ### Fixed
 
+- Tag-push releases publish to crates.io again. `publish.yml`
+  referenced a secret `CARGO_REGISTRY_TOKEN` that does not exist; the
+  numtide org secret is `CRATES_IO_TOKEN` (visible to this repo via
+  the organization-secrets API). A preflight step now fails with a
+  clear message when the token is empty instead of a bare "please
+  provide a non-empty token" from `cargo publish`. (R1-003)
+- Release assets no longer depend on a human creating the GitHub
+  release before the tag-push run reaches `gh release upload`. The
+  `verify` job creates a draft release (`--generate-notes`,
+  `--verify-tag`) when none exists, exactly once, before the upload
+  jobs run; they upload into it and a maintainer publishes the draft.
+  v0.4.0/v0.5.0 predate the asset jobs; the only tag-push runs so far
+  failed in the crates.io publish step (R1-003). (R1-033, R2-026)
+- Node 20 actions in `publish.yml` retired by GitHub on 2026-09-16/23
+  replaced with their Node 24 majors, SHA-pinned and checked for
+  `runs.using: node24` at the pinned tag: `actions/setup-node` v4.4.0
+  → v7.0.0, `actions/upload-artifact` v4.4.3 → v7.0.1,
+  `mymindstorm/setup-emsdk` v14 → v16 (also fixes the "Cache service
+  responded with 400" from its retired `@actions/cache` backend),
+  `actions/attest-build-provenance` v3.2.0 → v4.2.2 (composite over
+  `actions/attest` node24), plus `actions/download-artifact` v8.0.1
+  for the new job. (R1-036)
+- `bindings/go` compiles from a clean clone again: `go.mod` bumped
+  `github.com/tree-sitter/go-tree-sitter` v0.24.0 → v0.25.0 (the
+  first release that loads an ABI 15 parser) and `go.sum` is committed
+  next to it. (R1-013)
+- `src/scanner.c` includes `"tree_sitter/parser.h"` with quotes
+  instead of angle brackets, so the header next to it is found
+  without an extra `-I` flag, the way the generated `parser.c` does
+  it. `CMakeLists.txt` project version 0.3.0 → 0.5.0, matching
+  `Cargo.toml`.
 - Equality (`==`, `!=`) and comparison (`<`, `<=`, `>`, `>=`) are now
   non-associative, matching Nix's `%nonassoc` declarations. Chained
   expressions like `1 == 2 == 3` and `1 < 2 < 3` are now parse errors,
