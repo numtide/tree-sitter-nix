@@ -179,12 +179,17 @@ def gen_matrix() -> list[dict]:
         for op in ["==", "!=", "<", ">", "<=", ">="]:
             cases.append({"kind": "unary-nonassoc-bypass", "unop": unop, "a": a, "op1": op, "b": b, "op2": op, "c": c})
 
+    # Raw accept/reject cases found by adversarial review (see below).
+    cases.extend(gen_extra_matrix())
     return cases
 
 
 def run_case(case: dict) -> dict:
     """Run a single cross-check case. Returns {pass, ...details}."""
     kind = case["kind"]
+
+    if kind == "raw":
+        return run_raw_case(case)
 
     if kind in ("binop2", "nonassoc-chain", "cross-tier"):
         a, op1, b, op2, c = case["a"], case["op1"], case["b"], case["op2"], case["c"]
@@ -238,32 +243,6 @@ def run_case(case: dict) -> dict:
         return {"pass": ok, "kind": kind, "expr": expr, "nix": "accept" if nix_accepts else "reject", "ts": "accept" if ts_accepts else "reject"}
 
     raise ValueError(f"unknown kind {kind}")
-
-
-def main():
-    cases = gen_matrix()
-    failures = []
-    by_kind = {}
-    for case in cases:
-        r = run_case(case)
-        by_kind.setdefault(r["kind"], {"pass": 0, "fail": 0})
-        if r["pass"]:
-            by_kind[r["kind"]]["pass"] += 1
-        else:
-            by_kind[r["kind"]]["fail"] += 1
-            failures.append(r)
-
-    print(f"# Oracle report: {len(cases)} cases, {len(failures)} failures\n")
-    print("kind\tpass\tfail")
-    for kind, stats in sorted(by_kind.items()):
-        print(f"{kind}\t{stats['pass']}\t{stats['fail']}")
-    if failures:
-        print(f"\n# Failures ({len(failures)}):\n")
-        print("expr\tnix\tts")
-        for f in failures:
-            print(f"{f['expr']}\t{f['nix']}\t{f['ts']}")
-    sys.exit(1 if failures else 0)
-
 
 
 # ---------------------------------------------------------------------------
@@ -342,10 +321,6 @@ def corpus_check() -> list[dict]:
     return failures
 
 
-# Override main to include corpus check.
-_orig_main = main
-
-
 def main():
     cases = gen_matrix()
     failures = []
@@ -390,7 +365,7 @@ def main():
 # ---------------------------------------------------------------------------
 
 def gen_extra_matrix() -> list[dict]:
-    """Cases the original matrix didn't cover. Found by skeptics."""
+    """Cases the original matrix didn't cover. Found by skeptics. Included by gen_matrix()."""
     cases = []
     # Chained has-attr: `a ? b ? c` is valid Nix (RHS is attrpath).
     cases.append({"kind": "raw", "expr": "a ? b ? c", "expect_ok": True})
@@ -440,20 +415,5 @@ def run_raw_case(case: dict) -> dict:
     return {"pass": ok, "kind": "raw", "expr": expr, "nix": "accept" if nix_ok else "reject", "ts": "accept" if ts_ok else "reject"}
 
 
-# Patch run_case to handle "raw" kind.
-_orig_run_case = run_case
-def run_case(case):
-    if case.get("kind") == "raw":
-        return run_raw_case(case)
-    return _orig_run_case(case)
-
-
-# Patch gen_matrix to include the extras.
-_orig_gen_matrix = gen_matrix
-def gen_matrix():
-    return _orig_gen_matrix() + gen_extra_matrix()
-
-
-# Re-patch main since the function was redefined.
 if __name__ == "__main__":
     main()

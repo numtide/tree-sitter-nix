@@ -1,0 +1,17 @@
+file	corpus	ts_ok	nix_ok	nix_class
+nix/tests/functional/lang/eval-fail-dynamic-attrs-inherit-2.nix	nix-lang	1	0	syntax
+nix/tests/functional/lang/eval-fail-dynamic-attrs-inherit.nix	nix-lang	1	0	syntax
+nix/tests/functional/lang/eval-fail-dynamic-attrs-let-2.nix	nix-lang	1	0	syntax
+nix/tests/functional/lang/eval-fail-dynamic-attrs-let-3.nix	nix-lang	1	0	syntax
+nix/tests/functional/lang/eval-fail-dynamic-attrs-let.nix	nix-lang	1	0	syntax
+nix/tests/functional/lang/eval-fail-path-slash.nix	nix-lang	1	0	syntax
+nix/tests/functional/lang/eval-okay-attrs5.nix	nix-lang	0	1	ok
+nix/tests/functional/lang/eval-okay-deprecate-cursed-or.nix	nix-lang	0	1	ok
+nix/tests/functional/lang/parse-okay-crlf.nix	nix-lang	0	1	ok
+rnix-parser/test_data/parser/error/path_double_slash.nix	rnix-error	1	0	syntax
+rnix-parser/test_data/parser/error/path_interp_trailing_slash.nix	rnix-error	1	0	syntax
+rnix-parser/test_data/parser/error/path_trailing_slash.nix	rnix-error	1	0	syntax
+rnix-parser/test_data/parser/success/or-as-ident.nix	rnix-success	0	1	undefined-variable
+snix/snix/eval/src/tests/nix_tests/eval-fail-path-slash.nix	snix-nix_tests	1	0	syntax
+snix/snix/eval/src/tests/nix_tests/eval-okay-attrs5.nix	snix-nix_tests	0	1	ok
+snix/snix/eval/src/tests/nix_tests/parse-okay-crlf.nix	snix-nix_tests	0	1	ok

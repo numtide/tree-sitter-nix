@@ -1,0 +1,22 @@
+# Pinned reference corpora for test/oracle/differential.py.
+# Plain KEY=VALUE, sourced by fetch-corpora.sh (POSIX sh) and parsed by
+# differential.py. *_NAME is the directory under $CORPORA_DIR; *_SUBDIRS
+# are space-separated, relative to the upstream repo root.
+# Bump a REV deliberately: new upstream test files can add disagreements,
+# which must then be triaged into baselines/differential-disagreements.tsv.
+
+NIX_NAME=nix
+NIX_URL=https://github.com/NixOS/nix.git
+NIX_REV=b983ba81582a30085a6e8f66d50b97ecfe5acce7
+NIX_SUBDIRS="tests/functional/lang"
+
+RNIX_NAME=rnix-parser
+RNIX_URL=https://github.com/nix-community/rnix-parser.git
+RNIX_REV=0807ff9d2f64ddbc7e57beb3a47dc26678d3d8d3
+RNIX_SUBDIRS="test_data/parser"
+
+# No GitHub mirror exists for snix; git.snix.dev (Forgejo) is the only source.
+SNIX_NAME=snix
+SNIX_URL=https://git.snix.dev/snix/snix.git
+SNIX_REV=c8092dc4898a2f27ce9dfa31bb0630c431235bd6
+SNIX_SUBDIRS="snix/eval/src/tests/nix_tests snix/eval/src/tests/snix_tests"

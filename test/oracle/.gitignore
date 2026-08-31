@@ -1,0 +1,4 @@
+# fetched reference corpora and oracle run outputs
+corpora/
+.corpora/
+out/
