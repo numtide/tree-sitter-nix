@@ -1,0 +1,205 @@
+name: Nightly
+
+# Non-blocking measurement loop: the whole-nixpkgs parse gate plus the
+# performance, memory, incremental and ASan harnesses (make targets under
+# test/bench/). Nothing here gates a PR; the artifacts are the record.
+#
+# The bench and harness jobs check nixpkgs out at the revision recorded
+# in test/bench/baseline.json ("nixpkgs_rev"), the one the committed
+# sample lists were drawn from; the PR oracles follow flake.lock instead.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  # Private compiled-parser cache (R2-036).
+  TREE_SITTER_LIBDIR: ${{ github.workspace }}/../tree-sitter-libdir
+  # Every Makefile measurement target writes its result files here
+  # (RESULTS_DIR in the Makefile); uploaded per job.
+  RESULTS_DIR: ${{ github.workspace }}/measure-out
+
+jobs:
+  nixpkgs-parse:
+    name: parse all of nixpkgs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: NixOS/nixpkgs
+          path: nixpkgs
+          fetch-depth: 1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the pinned tree-sitter CLI
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild tree-sitter-cli
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: "Parse every .nix file (gate: 0 failed parses)"
+        # `--stat` counts a tree with an ERROR or MISSING node as a failed
+        # parse; the summary line also carries the throughput.
+        run: |
+          mkdir -p "$RESULTS_DIR"
+          find nixpkgs -type f -name '*.nix' | LC_ALL=C sort > "$RESULTS_DIR/nixpkgs-files.txt"
+          echo "files: $(wc -l < "$RESULTS_DIR/nixpkgs-files.txt")"
+          npx tree-sitter parse -q --stat --paths "$RESULTS_DIR/nixpkgs-files.txt" \
+            > "$RESULTS_DIR/nixpkgs-parse-stat.txt" 2>&1 || true
+          cat "$RESULTS_DIR/nixpkgs-parse-stat.txt"
+          grep -q 'failed parses: 0;' "$RESULTS_DIR/nixpkgs-parse-stat.txt"
+
+      - name: MISSING nodes on a fixed sample (R1-049)
+        # The summary hides *which* file recovered with a MISSING node; a
+        # non-quiet run on every 50th file keeps them visible in the log.
+        run: |
+          awk 'NR % 50 == 0' "$RESULTS_DIR/nixpkgs-files.txt" > "$RESULTS_DIR/nixpkgs-sample.txt"
+          npx tree-sitter parse --paths "$RESULTS_DIR/nixpkgs-sample.txt" > "$RUNNER_TEMP/sample-parse.txt" 2>&1 || true
+          grep -E '\((MISSING|ERROR)' "$RUNNER_TEMP/sample-parse.txt" > "$RESULTS_DIR/nixpkgs-sample-missing.txt" || true
+          echo "MISSING/ERROR lines in sample: $(wc -l < "$RESULTS_DIR/nixpkgs-sample-missing.txt")"
+          test ! -s "$RESULTS_DIR/nixpkgs-sample-missing.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-nixpkgs-parse
+          path: measure-out
+          if-no-files-found: warn
+
+  bench:
+    name: benchmark vs baseline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Read the nixpkgs revision the sample lists were drawn from
+        # test/bench/sample2000.txt lists nixpkgs paths that exist at the
+        # revision recorded next to them in baseline.json (not the flake's
+        # pin, which moves with Renovate and would drop sample files).
+        id: nixpkgs
+        run: |
+          rev=$(python3 -c 'import json; print(json.load(open("test/bench/baseline.json"))["nixpkgs_rev"])')
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: NixOS/nixpkgs
+          ref: ${{ steps.nixpkgs.outputs.rev }}
+          path: nixpkgs
+          fetch-depth: 1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the tree-sitter CLI the baseline was measured with
+        # bench.sh needs `parse --lib-path` (CLI >= 0.27) to time a
+        # prebuilt .so; the generator pin (0.25.10) has no such flag. The
+        # ABI 15 parser.c it generated loads fine in 0.27, and the baseline
+        # records the CLI version it was measured with.
+        run: |
+          cli=$(python3 -c 'import json; print(json.load(open("test/bench/baseline.json"))["tree_sitter_cli"])')
+          npm install --no-save "tree-sitter-cli@$cli"
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+          node_modules/.bin/tree-sitter --version
+
+      - name: Build the parser of the commit the baseline was measured on
+        # Absolute timings are machine-specific, so the gate is relative:
+        # bench.sh runs this build (BASELINE_SO) and HEAD's alternately on
+        # the same runner and compare_bench.py checks the ratio of medians.
+        id: baseline
+        run: |
+          commit=$(python3 -c 'import json; print(json.load(open("test/bench/baseline.json"))["commit"])')
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ steps.baseline.outputs.commit }}
+          path: baseline-src
+          fetch-depth: 1
+
+      - run: mkdir -p build && (cd baseline-src && tree-sitter build -o "$GITHUB_WORKSPACE/build/baseline.so")
+
+      - name: Benchmark (HEAD median within BENCH_THRESHOLD of the baseline commit)
+        run: make bench NIXPKGS="$GITHUB_WORKSPACE/nixpkgs" BASELINE=test/bench/baseline.json BASELINE_SO="$GITHUB_WORKSPACE/build/baseline.so"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-bench
+          path: measure-out
+          if-no-files-found: warn
+
+  harness:
+    name: harness / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [incremental, memory, fuzz-asan]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Read the nixpkgs revision the sample lists were drawn from
+        # See the bench job: sample2000.txt / incremental-sample.txt are
+        # valid at baseline.json's nixpkgs_rev, not necessarily at the
+        # flake's pin.
+        id: nixpkgs
+        run: |
+          rev=$(python3 -c 'import json; print(json.load(open("test/bench/baseline.json"))["nixpkgs_rev"])')
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: NixOS/nixpkgs
+          ref: ${{ steps.nixpkgs.outputs.rev }}
+          path: nixpkgs
+          fetch-depth: 1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the pinned tree-sitter CLI
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild tree-sitter-cli
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # The C harnesses link libtree-sitter. Ubuntu ships 0.20 (ABI 14 at
+      # most), so the Makefile downloads the core sources matching
+      # `tree-sitter --version` into build/ and compiles lib.c itself.
+      #
+      # INCR_MAX: HEAD still has the R2-009 incremental mismatches (comment
+      # before `else`/`++`); the tolerated count is the one recorded in the
+      # baseline, so the gate only catches regressions until the grammar
+      # fix lands and the baseline goes back to 0.
+      - name: make ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          incr_max=$(python3 -c 'import json; print(json.load(open("test/bench/baseline.json")).get("incremental", {}).get("mismatches", 0))')
+          make "$TARGET" NIXPKGS="$GITHUB_WORKSPACE/nixpkgs" INCR_MAX="$incr_max"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: nightly-${{ matrix.target }}
+          path: measure-out
+          if-no-files-found: warn

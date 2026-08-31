@@ -1,0 +1,273 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The CLI caches compiled parsers by grammar name, not by source
+  # (R2-036). Keep every job's cache private and outside the checkout.
+  TREE_SITTER_LIBDIR: ${{ github.workspace }}/../tree-sitter-libdir
+
+jobs:
+  # --------------------------------------------------------------------
+  # Grammar: generated sources, corpus tests, fuzzing, queries.
+  # --------------------------------------------------------------------
+  generate-diff:
+    name: generated sources match the pinned generator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the pinned tree-sitter CLI
+        # --ignore-scripts skips the node-gyp build of the nan binding
+        # (broken, R1-004) so it cannot fail unrelated jobs; the rebuild
+        # then runs only tree-sitter-cli's install.js, which fetches the
+        # exact version locked in package-lock.json (R1-011).
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild tree-sitter-cli
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+          npx tree-sitter --version
+
+      - run: npx tree-sitter generate --abi 15
+
+      - name: Committed src/ must match what the pinned generator emits
+        run: |
+          git diff --exit-code -- src/
+          test -z "$(git status --porcelain -- src/)"
+
+  test:
+    name: corpus tests and fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the pinned tree-sitter CLI
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild tree-sitter-cli
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - run: npx tree-sitter test
+
+      - name: Fuzz the corpus (short budget)
+        # `tree-sitter fuzz` exits 0 even when a case fails (R1-067); the
+        # Makefile target greps the log and fixes the seed (FUZZ_SEED) so a
+        # failure reproduces locally with `make fuzz`.
+        run: make fuzz
+
+  queries:
+    name: queries compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the pinned tree-sitter CLI
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild tree-sitter-cli
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Every queries/*.scm compiles against the grammar
+        run: |
+          for q in queries/*.scm; do
+            echo "::group::$q"
+            npx tree-sitter query "$q" test/highlight/basic.nix
+            echo "::endgroup::"
+          done
+
+      - name: Tags produce at least one row
+        # queries/tags.scm uses bare @definition/@reference captures, which
+        # the tags loader rejects, so no tags are produced at all (R1-014).
+        # Informational (red, non-blocking) until that finding is fixed.
+        continue-on-error: true
+        run: |
+          # `tags` resolves grammars through the CLI config, not the cwd.
+          printf '{ "parser-directories": ["%s"] }\n' "$(dirname "$PWD")" > "$RUNNER_TEMP/ts-config.json"
+          npx tree-sitter tags --config-path "$RUNNER_TEMP/ts-config.json" test/highlight/basic.nix | tee tags.txt
+          grep -q . tags.txt
+
+  # --------------------------------------------------------------------
+  # Oracles: cross-check the grammar against nix-instantiate and the
+  # reference corpora (targets and scripts live under test/oracle/).
+  # --------------------------------------------------------------------
+  oracles:
+    name: oracles (nix-instantiate, reference corpora)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Read the nixpkgs revision pinned in flake.lock
+        # The oracle samples are lists of nixpkgs paths; following the
+        # flake's own pin keeps them valid and moves with Renovate.
+        id: nixpkgs
+        run: |
+          rev=$(python3 -c 'import json; print(json.load(open("flake.lock"))["nodes"]["nixpkgs"]["locked"]["rev"])')
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: NixOS/nixpkgs
+          ref: ${{ steps.nixpkgs.outputs.rev }}
+          path: nixpkgs
+          fetch-depth: 1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the pinned tree-sitter CLI
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild tree-sitter-cli
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Cache reference corpora
+        # fetch-corpora.sh leaves a corpus alone when its .corpus-rev
+        # marker already matches corpora.lock.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: test/oracle/corpora
+          key: oracle-corpora-${{ hashFiles('test/oracle/corpora.lock') }}
+
+      - name: Operator precedence oracle
+        run: make oracle
+        env:
+          NIXPKGS_PATH: ${{ github.workspace }}/nixpkgs
+
+      - name: Differential oracle (nix, rnix-parser, snix corpora)
+        run: make differential
+
+      - name: AST shape oracle (nixpkgs sample)
+        run: make shape-oracle NIXPKGS="$GITHUB_WORKSPACE/nixpkgs"
+
+  flake:
+    name: flake evaluates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      # Building the checks is buildbot's job; here we only make sure the
+      # flake still evaluates (bad hashes, syntax, missing files).
+      - run: nix flake check --no-build
+
+  # --------------------------------------------------------------------
+  # Bindings, one job each so a broken binding names itself.
+  # --------------------------------------------------------------------
+  rust:
+    name: bindings / rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable (2026-04-19)
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - run: cargo test --locked
+
+  python:
+    name: bindings / python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build the extension and parse with it
+        # tree-sitter >= 0.25 is the first py-tree-sitter that loads an
+        # ABI 15 parser.
+        run: |
+          python -m pip install --upgrade pip
+          pip install . 'tree-sitter>=0.25'
+          python -c 'import tree_sitter as ts, tree_sitter_nix as nix; t = ts.Parser(ts.Language(nix.language())).parse(b"{ a = 1; }"); assert not t.root_node.has_error, str(t.root_node); print(t.root_node)'
+
+  node:
+    name: bindings / node
+    runs-on: ubuntu-latest
+    # The legacy nan binding cannot be loaded by any release of the
+    # `tree-sitter` npm package (R1-004). Informational until it is
+    # rewritten on node-addon-api.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Build the binding (node-gyp) and load it from tree-sitter
+        run: |
+          npm ci
+          npm install --no-save tree-sitter@0.25
+          node -e 'const Parser = require("tree-sitter"); const p = new Parser(); p.setLanguage(require(".")); const t = p.parse("{ a = 1; }"); if (t.rootNode.hasError) throw new Error(t.rootNode.toString()); console.log(t.rootNode.toString())'
+          node --test bindings/node/binding_test.js
+
+  go:
+    name: bindings / go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Strict; the scanner include path that broke this from a clean
+      # clone (R1-013) is fixed in src/scanner.c.
+      - run: go build ./bindings/go && go test ./bindings/go
+
+  zig:
+    name: bindings / zig
+    runs-on: ubuntu-latest
+    # build.zig.zon predates Zig 0.14's mandatory `fingerprint` (R1-063).
+    continue-on-error: true
+    env:
+      # mlugg/setup-zig v2.2.1 (and its main) still declares
+      # `runs.using: node20`, which GitHub-hosted runners stop executing
+      # on 2026-09-16 (R1-036); run it on node24 so the job keeps
+      # reporting the R1-063 signal rather than an action-runtime error.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1 (node20, see env above)
+        with:
+          version: "0.14.1"
+
+      - run: zig build
+
+  # swift: Package.swift needs Xcode/macOS runners, which are out of the
+  # free-minutes budget for this repo. Not exercised here (see R1-035).
