@@ -20,3 +20,9 @@ zig-out/
 _build/
 *.install
 result
+
+# local scratch (reference sources, measurements)
+.scratch/
+
+# measurement loop (make bench/memory/incremental/fuzz-asan)
+test/bench/results/

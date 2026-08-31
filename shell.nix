@@ -18,4 +18,11 @@ pkgs.mkShell {
     pkgs.rustfmt
     pkgs.clang-tools
   ];
+
+  # The C harnesses (make memory/incremental/fuzz-asan) compile
+  # libtree-sitter from source; point them at nixpkgs' copy instead of
+  # downloading a tarball inside the shell.
+  shellHook = ''
+    export TREE_SITTER_SRC=${pkgs.tree-sitter.src}
+  '';
 }

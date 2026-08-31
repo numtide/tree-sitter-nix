@@ -1,0 +1,72 @@
+{
+  "commit": "70f34e95e30b7ebcc40815d4385d68576c4a15cd",
+  "date": "2026-08-31T11:21:54Z",
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Platinum 8488C",
+    "cores": 32,
+    "os": "Linux 6.12.55-74.119.amzn2023.x86_64",
+    "hostname": "coder-aldo-alpha-0"
+  },
+  "tree_sitter_cli": "0.27.0",
+  "nixpkgs_rev": "597647d3b728353852b73cd8d75bbd8a7cb4ff67",
+  "bench": {
+    "sample": "test/bench/sample2000.txt",
+    "runs": 20,
+    "median_ms": 479.34,
+    "mean_ms": 479.34,
+    "stddev_ms": 3.06,
+    "min_ms": 473.65,
+    "max_ms": 483.81,
+    "failed_parses": 0,
+    "bytes_per_ms": 10955
+  },
+  "memory": {
+    "list": "test/bench/sample2000.txt",
+    "files": 2000,
+    "src_bytes": 4511224,
+    "tree_bytes": 131156672,
+    "nodes": 830919,
+    "named": 513716,
+    "anon": 317203,
+    "error": 0,
+    "missing": 0,
+    "bytes_per_node": 157.85,
+    "tree_bytes_per_src_byte": 29.073,
+    "parse_ms": 482.0,
+    "bytes_per_ms": 9359,
+    "rss_kb_end": 3704,
+    "n_alloc": 1431845,
+    "total_alloc_bytes": 132473016,
+    "rss_kb_after_parser_delete": 3704,
+    "live_bytes_after_parser_delete": 0,
+    "peak_rss_kb": 13264,
+    "inline_leaf": 462360,
+    "heap_leaf": 50864,
+    "heap_internal": 1366272,
+    "visible_internal": 319695,
+    "hidden_internal": 1046577,
+    "heap_bytes": 128390848,
+    "hidden_by_symbol": {
+      "_expr_select_expression": 109777,
+      "_expr_simple": 109777,
+      "binding_set_repeat1": 94276,
+      "_expr_apply_expression": 89872,
+      "_expr_function_expression": 78584,
+      "_expr_high": 73800,
+      "_expr_cmp": 71181,
+      "_expr_low": 70965,
+      "_expression": 70831,
+      "_expr_if": 70831
+    }
+  },
+  "incremental": {
+    "files": 300,
+    "npos": 10,
+    "edits": 54000,
+    "mismatches": 1
+  },
+  "language_version": 15,
+  "state_count": 635,
+  "symbol_count": 122,
+  "token_count": 67
+}
